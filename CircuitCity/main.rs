@@ -1,8 +1,8 @@
 //! CircuitCities — PCB-inspired city builder built on Bevy ECS.
 //!
 //! Architecture:
-//!   * `components.rs` — per-entity data (District, Trace, Via, …)
-//!   * `resources.rs`  — global state (ActiveLayer, Credits, BuildState, Rng)
+//!   * `components.rs` — per-entity data (District, Trace, Via, PowerSource, Ground, Led, …)
+//!   * `resources.rs`  — global state (ActiveLayer, Credits, BuildState, PhotonCount, Rng)
 //!   * `systems.rs`    — all behaviour expressed as Bevy systems
 
 mod components;
@@ -27,6 +27,7 @@ fn main() {
         .init_resource::<ActiveLayer>()
         .init_resource::<Credits>()
         .init_resource::<BuildState>()
+        .init_resource::<PhotonCount>()
         .init_resource::<Rng>()
         .add_systems(Startup, setup)
         .add_systems(
@@ -34,6 +35,11 @@ fn main() {
             (
                 layer_switch,
                 build_input,
+                spawn_electrons,
+                move_electrons,
+                tick_leds,
+                drift_photons,
+                collect_photons,
                 service_score,
                 city_growth,
                 income,

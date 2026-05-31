@@ -28,6 +28,12 @@ pub enum BuildMode {
     PlacingDistrict(DistrictKind),
     /// Click canvas to place a full (3-layer) via. Phase 1 adds type picker.
     PlacingVia,
+    /// Place a power source node (P key).
+    PlacingPowerSource,
+    /// Place a ground node (G key).
+    PlacingGround,
+    /// Place an LED node (L key).
+    PlacingLed,
 }
 
 /// Transient build/drag state.
@@ -37,6 +43,12 @@ pub struct BuildState {
     /// Entity grabbed at the start of a routing drag, if any.
     pub drag_from: Option<Entity>,
 }
+
+// ---- Photon count -------------------------------------------------------
+
+/// Total photons collected by the player this session.
+#[derive(Resource, Default)]
+pub struct PhotonCount(pub u32);
 
 // ---- RNG ----------------------------------------------------------------
 

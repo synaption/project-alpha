@@ -77,6 +77,13 @@ impl LayerSet {
     }
 }
 
+// ---- CircuitNode marker -------------------------------------------------
+
+/// Marker: this entity can serve as a trace endpoint (District, Via, PowerSource, Ground, Led).
+/// Used as a unified filter for routing and spacing checks.
+#[derive(Component)]
+pub struct CircuitNode;
+
 // ---- District -----------------------------------------------------------
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -131,7 +138,8 @@ impl District {
 // ---- Trace --------------------------------------------------------------
 
 /// A single infrastructure connection between two endpoint entities on one layer.
-#[derive(Component)]
+/// Copy so it can be collected into a Vec snapshot inside systems.
+#[derive(Component, Clone, Copy)]
 pub struct Trace {
     pub layer: Layer,
     pub from: Entity,
@@ -148,6 +156,50 @@ pub struct Trace {
 #[derive(Component)]
 pub struct Via {
     pub connects: LayerSet,
+}
+
+// ---- Circuit components -------------------------------------------------
+
+/// Spawns electrons onto connected Power-layer traces at a fixed rate.
+#[derive(Component)]
+pub struct PowerSource {
+    pub timer: f32,   // seconds until next electron emission
+}
+
+impl PowerSource {
+    pub fn new() -> Self { Self { timer: 0.0 } }
+}
+
+/// Absorbs electrons — the sink of every circuit path.
+#[derive(Component)]
+pub struct Ground;
+
+/// Emits a photon each time an electron passes through.
+#[derive(Component)]
+pub struct Led {
+    pub lit_timer: f32,   // seconds remaining of the lit visual state
+}
+
+impl Led {
+    pub fn new() -> Self { Self { lit_timer: 0.0 } }
+}
+
+// ---- Moving particles ---------------------------------------------------
+
+/// A particle travelling along a Power-layer trace from a PowerSource toward Ground.
+#[derive(Component)]
+pub struct Electron {
+    pub trace: Entity,     // which trace this electron is currently on
+    pub t: f32,            // progress 0..1 along that trace
+    pub forward: bool,     // true = from→to direction, false = to→from
+    pub prev_node: Entity, // the node we just left (prevents immediate reversal)
+}
+
+/// A collectible photon emitted by an LED when an electron passes through.
+#[derive(Component)]
+pub struct Photon {
+    pub velocity: Vec2,
+    pub lifetime: f32,     // seconds remaining
 }
 
 // ---- HUD marker ---------------------------------------------------------
