@@ -1,13 +1,9 @@
-//! CircuitCities — network-routing puzzle game built on Bevy's ECS.
+//! CircuitCities — PCB-inspired city builder built on Bevy ECS.
 //!
 //! Architecture:
-//!   * `components.rs` — per-entity data (Station, Train, …)
-//!   * `resources.rs`  — global state (score, lines, timers, RNG)
-//!   * `systems.rs`    — all behaviour, expressed as Bevy systems
-//!
-//! `main` just assembles the `App`: it registers the resources and schedules
-//! the systems. Bevy runs the `Update` systems every frame, parallelising the
-//! ones whose data accesses don't conflict.
+//!   * `components.rs` — per-entity data (District, Trace, Via, …)
+//!   * `resources.rs`  — global state (ActiveLayer, Credits, BuildState, Rng)
+//!   * `systems.rs`    — all behaviour expressed as Bevy systems
 
 mod components;
 mod resources;
@@ -27,21 +23,20 @@ fn main() {
             }),
             ..default()
         }))
-        .insert_resource(ClearColor(Color::srgb(0.07, 0.07, 0.10)))
-        .init_resource::<Game>()
-        .init_resource::<Lines>()
-        .init_resource::<ActiveLine>()
-        .init_resource::<DragState>()
-        .init_resource::<SpawnTimers>()
+        .insert_resource(ClearColor(Color::srgb(0.05, 0.06, 0.08)))
+        .init_resource::<ActiveLayer>()
+        .init_resource::<Credits>()
+        .init_resource::<BuildState>()
         .init_resource::<Rng>()
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
-                line_input,
-                spawn_stations,
-                spawn_passengers,
-                move_trains,
+                layer_switch,
+                build_input,
+                service_score,
+                city_growth,
+                income,
                 draw,
                 update_ui,
             ),

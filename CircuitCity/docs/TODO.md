@@ -1,14 +1,14 @@
 # CircuitCities — TODO
 
 ## Phase 0: Foundation Rewrite
-- [ ] Remove survival loop (spawn timers, game-over, passenger queue, move_trains)
-- [ ] Add Layer enum and active_layer resource
-- [ ] Add District component (replaces Station)
-- [ ] Add Trace component (replaces implicit line segments)
-- [ ] Add Via component
-- [ ] Add BuildMode resource and build_input system
-- [ ] Add layer_switch system (Tab/1/2/3)
-- [ ] Stub out service_score, city_growth, income systems
+- [x] Remove survival loop (spawn timers, game-over, passenger queue, move_trains)
+- [x] Add Layer enum and active_layer resource
+- [x] Add District component (replaces Station)
+- [x] Add Trace component (replaces implicit line segments)
+- [x] Add Via component
+- [x] Add BuildMode resource and build_input system
+- [x] Add layer_switch system (Tab/1/2/3)
+- [x] Stub out service_score, city_growth, income systems
 
 ## Phase 1: Layers and Vias Working
 - [ ] Render traces per-layer with amber/cyan/green, dim inactive layers to 25%

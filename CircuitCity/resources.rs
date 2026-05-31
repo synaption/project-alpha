@@ -1,93 +1,51 @@
 //! ECS **resources** — global, single-instance game state.
-//!
-//! Resources are world-unique data (as opposed to per-entity components).
-//! Here they hold the score, the metro lines, transient input state, spawn
-//! timers, and a tiny self-contained random number generator.
 
-use crate::components::Shape;
+use crate::components::{DistrictKind, Layer};
 use bevy::prelude::*;
 
-/// Whether the game is still running or has ended (a station overflowed).
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub enum Phase {
+// ---- Active layer -------------------------------------------------------
+
+#[derive(Resource, Default)]
+pub struct ActiveLayer(pub Layer);
+
+// ---- Credits ------------------------------------------------------------
+
+#[derive(Resource)]
+pub struct Credits(pub f32);
+
+impl Default for Credits {
+    fn default() -> Self { Self(120.0) }
+}
+
+// ---- Build mode ---------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum BuildMode {
+    /// Click-drag between two endpoints to lay a trace on the active layer.
     #[default]
-    Playing,
-    GameOver,
+    Routing,
+    /// Click empty canvas space to place a district of this type.
+    PlacingDistrict(DistrictKind),
+    /// Click canvas to place a full (3-layer) via. Phase 1 adds type picker.
+    PlacingVia,
 }
 
-/// Top-level game state.
-#[derive(Resource)]
-pub struct Game {
-    pub score: u32,
-    pub phase: Phase,
-}
-
-impl Default for Game {
-    fn default() -> Self {
-        Self {
-            score: 0,
-            phase: Phase::Playing,
-        }
-    }
-}
-
-/// One metro line: an ordered list of station entities plus a display colour.
-/// `has_train` ensures we only ever spawn a single train per line.
-pub struct MetroLine {
-    pub stations: Vec<Entity>,
-    pub color: Color,
-    pub has_train: bool,
-}
-
-/// All metro lines in the game.
+/// Transient build/drag state.
 #[derive(Resource, Default)]
-pub struct Lines {
-    pub lines: Vec<MetroLine>,
+pub struct BuildState {
+    pub mode: BuildMode,
+    /// Entity grabbed at the start of a routing drag, if any.
+    pub drag_from: Option<Entity>,
 }
 
-/// Which line the player is currently editing (selected with keys 1/2/3).
-#[derive(Resource)]
-pub struct ActiveLine(pub usize);
+// ---- RNG ----------------------------------------------------------------
 
-impl Default for ActiveLine {
-    fn default() -> Self {
-        Self(0)
-    }
-}
-
-/// Transient state for the click-drag that builds a connection between two
-/// stations.
-#[derive(Resource, Default)]
-pub struct DragState {
-    pub from: Option<Entity>,
-}
-
-/// Timers controlling how often new stations and passengers appear.
-#[derive(Resource)]
-pub struct SpawnTimers {
-    pub station: Timer,
-    pub passenger: Timer,
-}
-
-impl Default for SpawnTimers {
-    fn default() -> Self {
-        Self {
-            station: Timer::from_seconds(9.0, TimerMode::Repeating),
-            passenger: Timer::from_seconds(1.6, TimerMode::Repeating),
-        }
-    }
-}
-
-/// A tiny xorshift64 PRNG kept in-house so the project pulls in **no** extra
-/// crates beyond Bevy itself.
+/// Xorshift64 PRNG — no extra crates needed.
 #[derive(Resource)]
 pub struct Rng(pub u64);
 
 impl Default for Rng {
-    fn default() -> Self {
-        // Any non-zero seed works.
-        Self(0x9E37_79B9_7F4A_7C15)
-    }
+    fn default() -> Self { Self(0x9E37_79B9_7F4A_7C15) }
 }
 
 impl Rng {
@@ -100,17 +58,11 @@ impl Rng {
         x
     }
 
-    /// Uniform float in [0, 1).
     pub fn f32(&mut self) -> f32 {
-        // Use the top 24 bits for a well-distributed mantissa.
         (self.next_u64() >> 40) as f32 / (1u64 << 24) as f32
     }
 
     pub fn range(&mut self, lo: f32, hi: f32) -> f32 {
         lo + (hi - lo) * self.f32()
-    }
-
-    pub fn pick_shape(&mut self) -> Shape {
-        Shape::all()[(self.next_u64() % 3) as usize]
     }
 }

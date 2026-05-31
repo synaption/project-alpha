@@ -1,455 +1,312 @@
-//! ECS **systems** — all game logic.
-//!
-//! Each `fn` here is a Bevy system: it declares the data it needs as
-//! parameters (queries over components, plus resources), and Bevy schedules
-//! them, running non-conflicting systems in parallel automatically.
+//! ECS **systems** — all game logic for CircuitCities.
 
 use crate::components::*;
 use crate::resources::*;
 use bevy::prelude::*;
 
-// ---- Tunable constants -----------------------------------------------------
+// ---- Constants -----------------------------------------------------------
 
-pub const STATION_RADIUS: f32 = 16.0;
-pub const TRAIN_SPEED: f32 = 150.0; // world units / second
-pub const TRAIN_CAPACITY: usize = 6;
-pub const QUEUE_LIMIT: usize = 8; // passengers waiting before game over
-pub const BOUNDS_X: f32 = 470.0;
-pub const BOUNDS_Y: f32 = 300.0;
-pub const MIN_STATION_DIST: f32 = 95.0;
+pub const DISTRICT_RADIUS: f32 = 18.0;
+pub const VIA_RADIUS: f32 = 8.0;
+pub const MIN_DISTRICT_SPACING: f32 = 80.0;
+pub const GRAB_RADIUS: f32 = 26.0; // click tolerance around a district
+pub const VIA_GRAB_RADIUS: f32 = 14.0;
 
-// ---- Startup ---------------------------------------------------------------
+pub const TRACE_COST_POWER: u32 = 2;   // also used for Data layer
+pub const TRACE_COST_TRANSIT: u32 = 3;
 
-/// Spawns the camera, the HUD text, three empty lines, and a few starting
-/// stations.
-pub fn setup(mut commands: Commands, mut lines: ResMut<Lines>) {
+// ---- Startup -------------------------------------------------------------
+
+pub fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
 
     commands.spawn((
-        Text::new("Score: 0"),
-        TextFont {
-            font_size: 26.0,
-            ..default()
-        },
+        Text::new(""),
+        TextFont { font_size: 20.0, ..default() },
         TextColor(Color::WHITE),
         Node {
             position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(14.0),
+            top: Val::Px(10.0),
+            left: Val::Px(12.0),
             ..default()
         },
         ScoreText,
     ));
 
-    lines.lines = vec![
-        MetroLine {
-            stations: vec![],
-            color: Color::srgb(0.90, 0.27, 0.27),
-            has_train: false,
-        },
-        MetroLine {
-            stations: vec![],
-            color: Color::srgb(0.27, 0.55, 0.95),
-            has_train: false,
-        },
-        MetroLine {
-            stations: vec![],
-            color: Color::srgb(0.32, 0.80, 0.42),
-            has_train: false,
-        },
-    ];
-
-    // One station of each shape, arranged in a triangle.
-    for (i, shape) in Shape::all().into_iter().enumerate() {
-        let angle = i as f32 * std::f32::consts::TAU / 3.0;
-        let pos = Vec2::new(angle.cos() * 150.0, angle.sin() * 150.0);
-        spawn_station(&mut commands, shape, pos);
+    // Three starting districts in a triangle so the player can immediately
+    // start routing traces between them.
+    for (i, kind) in [
+        DistrictKind::PowerPlant,
+        DistrictKind::Residential,
+        DistrictKind::DataCenter,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let angle = i as f32 * std::f32::consts::TAU / 3.0 - std::f32::consts::FRAC_PI_2;
+        let pos = Vec2::new(angle.cos() * 210.0, angle.sin() * 210.0);
+        commands.spawn((District::new(kind), Transform::from_translation(pos.extend(0.0))));
     }
 }
 
-fn spawn_station(commands: &mut Commands, shape: Shape, pos: Vec2) {
-    commands.spawn((
-        Station {
-            shape,
-            queue: Vec::new(),
-        },
-        Transform::from_translation(pos.extend(0.0)),
-    ));
-}
+// ---- Layer switch --------------------------------------------------------
 
-// ---- Spawning over time ----------------------------------------------------
-
-/// Periodically adds a new station at a random, non-overlapping position.
-pub fn spawn_stations(
-    time: Res<Time>,
-    mut timers: ResMut<SpawnTimers>,
-    mut rng: ResMut<Rng>,
-    mut commands: Commands,
-    game: Res<Game>,
-    existing: Query<&Transform, With<Station>>,
-) {
-    if game.phase != Phase::Playing {
-        return;
+pub fn layer_switch(keys: Res<ButtonInput<KeyCode>>, mut active: ResMut<ActiveLayer>) {
+    if keys.just_pressed(KeyCode::Tab) {
+        active.0 = active.0.cycle();
     }
-    timers.station.tick(time.delta());
-    if !timers.station.just_finished() {
-        return;
+    if keys.just_pressed(KeyCode::Digit1) {
+        active.0 = Layer::Power;
     }
-
-    for _ in 0..40 {
-        let pos = Vec2::new(rng.range(-BOUNDS_X, BOUNDS_X), rng.range(-BOUNDS_Y, BOUNDS_Y));
-        let too_close = existing
-            .iter()
-            .any(|t| t.translation.truncate().distance(pos) < MIN_STATION_DIST);
-        if !too_close {
-            let shape = rng.pick_shape();
-            spawn_station(&mut commands, shape, pos);
-            return;
-        }
+    if keys.just_pressed(KeyCode::Digit2) {
+        active.0 = Layer::Data;
+    }
+    if keys.just_pressed(KeyCode::Digit3) {
+        active.0 = Layer::Transit;
     }
 }
 
-/// Periodically spawns a passenger at a random station, wanting a random
-/// (different) shape. If a station's queue overflows, the game ends.
-pub fn spawn_passengers(
-    time: Res<Time>,
-    mut timers: ResMut<SpawnTimers>,
-    mut rng: ResMut<Rng>,
-    mut game: ResMut<Game>,
-    mut stations: Query<&mut Station>,
-) {
-    if game.phase != Phase::Playing {
-        return;
-    }
-    timers.passenger.tick(time.delta());
-    if !timers.passenger.just_finished() {
-        return;
-    }
+// ---- Build input ---------------------------------------------------------
 
-    let count = stations.iter().count();
-    if count == 0 {
-        return;
-    }
-    let pick = (rng.next_u64() as usize) % count;
-
-    for (idx, mut st) in stations.iter_mut().enumerate() {
-        if idx != pick {
-            continue;
-        }
-        let mut dest = rng.pick_shape();
-        let mut guard = 0;
-        while dest == st.shape && guard < 6 {
-            dest = rng.pick_shape();
-            guard += 1;
-        }
-        st.queue.push(dest);
-        if st.queue.len() > QUEUE_LIMIT {
-            game.phase = Phase::GameOver;
-        }
-        return;
-    }
-}
-
-// ---- Input: building lines -------------------------------------------------
-
-/// Handles line selection (keys 1/2/3) and click-drag from one station to
-/// another to connect them on the active line.
-pub fn line_input(
+pub fn build_input(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cam: Query<(&Camera, &GlobalTransform)>,
-    stations: Query<(Entity, &Transform), With<Station>>,
-    mut drag: ResMut<DragState>,
-    mut active: ResMut<ActiveLine>,
-    mut lines: ResMut<Lines>,
+    active: Res<ActiveLayer>,
+    mut build: ResMut<BuildState>,
+    mut credits: ResMut<Credits>,
+    transforms: Query<&Transform>,
+    districts: Query<Entity, With<District>>,
+    vias: Query<Entity, With<Via>>,
     mut commands: Commands,
-    game: Res<Game>,
 ) {
-    if game.phase != Phase::Playing {
-        return;
-    }
-
-    if keys.just_pressed(KeyCode::Digit1) {
-        active.0 = 0;
-    }
-    if keys.just_pressed(KeyCode::Digit2) {
-        active.0 = 1;
-    }
-    if keys.just_pressed(KeyCode::Digit3) {
-        active.0 = 2;
-    }
-
-    let cursor = match cursor_world(&windows, &cam) {
-        Some(c) => c,
-        None => return,
-    };
-
-    if mouse.just_pressed(MouseButton::Left) {
-        drag.from = station_at(&stations, cursor);
-    }
-
-    if mouse.just_released(MouseButton::Left) {
-        if let Some(from) = drag.from.take() {
-            if let Some(to) = station_at(&stations, cursor) {
-                if to != from {
-                    connect(&mut lines, active.0, from, to, &mut commands);
-                }
-            }
-        }
-    }
-}
-
-/// Adds the edge `from -> to` to the active line if it extends one of the
-/// line's endpoints, and spawns the line's train the first time it has a path.
-fn connect(lines: &mut Lines, line_idx: usize, from: Entity, to: Entity, commands: &mut Commands) {
-    let Some(line) = lines.lines.get_mut(line_idx) else {
-        return;
-    };
-
-    if line.stations.is_empty() {
-        line.stations.push(from);
-        line.stations.push(to);
-    } else {
-        let first = *line.stations.first().unwrap();
-        let last = *line.stations.last().unwrap();
-        if last == from && !line.stations.contains(&to) {
-            line.stations.push(to);
-        } else if first == from && !line.stations.contains(&to) {
-            line.stations.insert(0, to);
-        } else if last == to && !line.stations.contains(&from) {
-            line.stations.push(from);
-        } else if first == to && !line.stations.contains(&from) {
-            line.stations.insert(0, from);
-        } else {
-            return; // not a valid extension
-        }
-    }
-
-    if line.stations.len() >= 2 && !line.has_train {
-        line.has_train = true;
-        commands.spawn((
-            Train {
-                line: line_idx,
-                from: 0,
-                to: 1,
-                t: 0.0,
-                dir: 1,
-                passengers: Vec::new(),
-            },
-            Transform::from_translation(Vec3::ZERO),
-        ));
-    }
-}
-
-// ---- Train movement + passenger logic --------------------------------------
-
-/// Moves each train along its line, and on arrival at a station drops off
-/// matching passengers and picks up deliverable ones.
-pub fn move_trains(
-    time: Res<Time>,
-    lines: Res<Lines>,
-    mut game: ResMut<Game>,
-    mut trains: Query<(&mut Train, &mut Transform), Without<Station>>,
-    mut stations: Query<(&Transform, &mut Station), Without<Train>>,
-) {
-    if game.phase != Phase::Playing {
-        return;
-    }
-    let dt = time.delta_secs();
-
-    for (mut train, mut tf) in trains.iter_mut() {
-        let Some(line) = lines.lines.get(train.line) else {
-            continue;
+    // V key: switch to via placement mode (toggles back to routing on second press).
+    if keys.just_pressed(KeyCode::KeyV) {
+        build.mode = match build.mode {
+            BuildMode::PlacingVia => BuildMode::Routing,
+            _ => BuildMode::PlacingVia,
         };
-        let n = line.stations.len();
-        if n < 2 {
-            continue;
-        }
+        build.drag_from = None;
+        return;
+    }
 
-        // Keep indices valid even if the line was edited.
-        if train.from >= n {
-            train.from = 0;
-        }
-        if train.to >= n {
-            train.to = (train.from + 1) % n;
-        }
+    // Escape cancels any placement mode back to routing.
+    if keys.just_pressed(KeyCode::Escape) {
+        build.mode = BuildMode::Routing;
+        build.drag_from = None;
+        return;
+    }
 
-        let from_e = line.stations[train.from];
-        let to_e = line.stations[train.to];
-        let from_pos = stations
-            .get(from_e)
-            .map(|(t, _)| t.translation.truncate())
-            .unwrap_or(Vec2::ZERO);
-        let to_pos = stations
-            .get(to_e)
-            .map(|(t, _)| t.translation.truncate())
-            .unwrap_or(Vec2::ZERO);
+    let Some(cursor) = cursor_world(&windows, &cam) else {
+        return;
+    };
 
-        let seg_len = from_pos.distance(to_pos).max(1.0);
-        train.t += TRAIN_SPEED * dt / seg_len;
+    match build.mode {
+        BuildMode::Routing => {
+            if mouse.just_pressed(MouseButton::Left) {
+                build.drag_from = endpoint_at(&transforms, &districts, &vias, cursor);
+            }
 
-        if train.t >= 1.0 {
-            train.t = 0.0;
-
-            // Which shapes are reachable on this line (for pickup decisions)?
-            let mut line_shapes: Vec<Shape> = Vec::new();
-            for &e in line.stations.iter() {
-                if let Ok((_, st)) = stations.get(e) {
-                    if !line_shapes.contains(&st.shape) {
-                        line_shapes.push(st.shape);
+            if mouse.just_released(MouseButton::Left) {
+                if let Some(from) = build.drag_from.take() {
+                    if let Some(to) = endpoint_at(&transforms, &districts, &vias, cursor) {
+                        if to != from {
+                            let cost = trace_cost(active.0);
+                            if credits.0 >= cost as f32 {
+                                credits.0 -= cost as f32;
+                                commands.spawn(Trace {
+                                    layer: active.0,
+                                    from,
+                                    to,
+                                    capacity: 10,
+                                    load: 0,
+                                    congested: false,
+                                });
+                            }
+                        }
                     }
                 }
             }
-
-            if let Ok((_, mut st)) = stations.get_mut(to_e) {
-                let here = st.shape;
-
-                // Drop off everyone whose destination is this shape.
-                let before = train.passengers.len();
-                train.passengers.retain(|&dest| dest != here);
-                game.score += (before - train.passengers.len()) as u32;
-
-                // Pick up waiting passengers we can actually deliver.
-                let mut i = 0;
-                while i < st.queue.len() && train.passengers.len() < TRAIN_CAPACITY {
-                    let dest = st.queue[i];
-                    if dest != here && line_shapes.contains(&dest) {
-                        train.passengers.push(dest);
-                        st.queue.remove(i);
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-
-            // Advance to the next segment, reversing at the ends.
-            train.from = train.to;
-            if train.dir == 1 && train.to == n - 1 {
-                train.dir = -1;
-            } else if train.dir == -1 && train.to == 0 {
-                train.dir = 1;
-            }
-            let next = train.from as i32 + train.dir;
-            train.to = next.clamp(0, n as i32 - 1) as usize;
         }
 
-        let pos = from_pos.lerp(to_pos, train.t.clamp(0.0, 1.0));
-        tf.translation = pos.extend(1.0);
+        BuildMode::PlacingDistrict(kind) => {
+            if mouse.just_pressed(MouseButton::Left) {
+                let cost = kind.placement_cost();
+                if credits.0 >= cost as f32 && !too_close_to_any(&transforms, &districts, &vias, cursor) {
+                    credits.0 -= cost as f32;
+                    commands.spawn((
+                        District::new(kind),
+                        Transform::from_translation(cursor.extend(0.0)),
+                    ));
+                }
+            }
+        }
+
+        BuildMode::PlacingVia => {
+            if mouse.just_pressed(MouseButton::Left) {
+                // Phase 1 adds a type picker; for now always place a full via.
+                commands.spawn((
+                    Via { connects: LayerSet::all() },
+                    Transform::from_translation(cursor.extend(0.0)),
+                ));
+                build.mode = BuildMode::Routing;
+            }
+        }
     }
 }
 
-// ---- Rendering (immediate-mode gizmos) -------------------------------------
+fn trace_cost(layer: Layer) -> u32 {
+    match layer {
+        Layer::Power | Layer::Data => TRACE_COST_POWER,
+        Layer::Transit             => TRACE_COST_TRANSIT,
+    }
+}
 
-/// Draws lines, the drag preview, stations + waiting passengers, and trains.
+fn too_close_to_any(
+    transforms: &Query<&Transform>,
+    districts: &Query<Entity, With<District>>,
+    vias: &Query<Entity, With<Via>>,
+    cursor: Vec2,
+) -> bool {
+    for e in districts.iter() {
+        if let Ok(t) = transforms.get(e) {
+            if t.translation.truncate().distance(cursor) < MIN_DISTRICT_SPACING {
+                return true;
+            }
+        }
+    }
+    for e in vias.iter() {
+        if let Ok(t) = transforms.get(e) {
+            if t.translation.truncate().distance(cursor) < MIN_DISTRICT_SPACING * 0.4 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+// ---- Phase 2 stubs -------------------------------------------------------
+
+/// Flood-fill reachability per layer and compute each district's service score.
+pub fn service_score() {
+    // Phase 2: flood-fill from each District along same-layer Traces,
+    // crossing Vias where the layer is in Via::connects. Weighted average
+    // of per-layer coverage ratios gives District::service_score.
+}
+
+/// Advance or decay district tiers based on sustained service score.
+pub fn city_growth() {
+    // Phase 2: increment District::tier_timer while service_score meets the
+    // threshold, promote tier after TIER_UP_DURATION seconds, decay toward
+    // lower tier when score drops below TIER_DOWN_THRESHOLD.
+}
+
+/// Accumulate Credits from districts proportional to tier × service_score.
+pub fn income() {
+    // Phase 2: each second add district income_rate[tier] × (service_score/100)
+    // to the Credits resource.
+}
+
+// ---- Rendering -----------------------------------------------------------
+
 pub fn draw(
     mut gizmos: Gizmos,
-    lines: Res<Lines>,
-    active: Res<ActiveLine>,
-    drag: Res<DragState>,
+    active: Res<ActiveLayer>,
+    build: Res<BuildState>,
     windows: Query<&Window>,
     cam: Query<(&Camera, &GlobalTransform)>,
-    stations: Query<(Entity, &Transform, &Station)>,
-    trains: Query<(&Transform, &Train)>,
+    transforms: Query<&Transform>,
+    districts: Query<(Entity, &District)>,
+    vias: Query<(Entity, &Via)>,
+    traces: Query<&Trace>,
 ) {
-    // Metro lines.
-    for line in lines.lines.iter() {
-        if line.stations.len() < 2 {
-            continue;
-        }
-        let mut pts: Vec<Vec2> = Vec::new();
-        for &e in line.stations.iter() {
-            if let Ok((_, t, _)) = stations.get(e) {
-                pts.push(t.translation.truncate());
-            }
-        }
-        if pts.len() >= 2 {
-            gizmos.linestrip_2d(pts, line.color);
-        }
+    // Traces — dim inactive layers to ~25% brightness.
+    for trace in traces.iter() {
+        let Ok(from_t) = transforms.get(trace.from) else { continue };
+        let Ok(to_t)   = transforms.get(trace.to)   else { continue };
+        let color = if trace.layer == active.0 {
+            trace.layer.color()
+        } else {
+            trace.layer.dim_color()
+        };
+        gizmos.line_2d(from_t.translation.truncate(), to_t.translation.truncate(), color);
     }
 
-    // Drag preview line from the grabbed station to the cursor.
-    if let Some(from) = drag.from {
-        if let Ok((_, t, _)) = stations.get(from) {
+    // Drag-preview trace from grabbed endpoint to cursor.
+    if let Some(from_e) = build.drag_from {
+        if let Ok(from_t) = transforms.get(from_e) {
             if let Some(cursor) = cursor_world(&windows, &cam) {
-                let col = lines
-                    .lines
-                    .get(active.0)
-                    .map(|l| l.color)
-                    .unwrap_or(Color::WHITE);
-                gizmos.line_2d(t.translation.truncate(), cursor, col);
+                gizmos.line_2d(from_t.translation.truncate(), cursor, active.0.color());
             }
         }
     }
 
-    // Stations and their waiting passengers.
-    for (_, t, st) in stations.iter() {
-        let p = t.translation.truncate();
-        draw_shape(&mut gizmos, st.shape, p, STATION_RADIUS, Color::WHITE);
-        for (i, &dest) in st.queue.iter().enumerate() {
-            let off = Vec2::new(-14.0 + (i as f32) * 7.0, STATION_RADIUS + 12.0);
-            draw_shape(&mut gizmos, dest, p + off, 3.0, Color::srgb(0.9, 0.85, 0.25));
+    // Vias — concentric rings, one per connected layer.
+    for (e, via) in vias.iter() {
+        let Ok(t) = transforms.get(e) else { continue };
+        let pos = t.translation.truncate();
+        let mut r = VIA_RADIUS;
+        for layer in [Layer::Power, Layer::Data, Layer::Transit] {
+            if via.connects.contains(layer) {
+                let color = if layer == active.0 {
+                    layer.color()
+                } else {
+                    layer.dim_color()
+                };
+                gizmos.circle_2d(pos, r, color);
+                r += 4.0;
+            }
         }
     }
 
-    // Trains and their onboard passengers.
-    for (t, train) in trains.iter() {
-        let p = t.translation.truncate();
-        let col = lines
-            .lines
-            .get(train.line)
-            .map(|l| l.color)
-            .unwrap_or(Color::WHITE);
-        gizmos.rect_2d(p, Vec2::new(22.0, 13.0), col);
-        for (i, &dest) in train.passengers.iter().enumerate() {
-            let off = Vec2::new(-8.0 + (i as f32) * 3.4, 0.0);
-            draw_shape(&mut gizmos, dest, p + off, 2.0, Color::WHITE);
+    // Districts — circle outline sized by tier, colored by kind.
+    for (e, district) in districts.iter() {
+        let Ok(t) = transforms.get(e) else { continue };
+        let pos = t.translation.truncate();
+        let color = district.kind.color();
+        let r = DISTRICT_RADIUS + (district.tier as f32 - 1.0) * 5.0;
+        gizmos.circle_2d(pos, r, color);
+
+        // Tier pips below the circle.
+        for i in 0..district.tier {
+            let dot = pos + Vec2::new(-4.0 + i as f32 * 4.5, -r - 9.0);
+            gizmos.circle_2d(dot, 2.0, color);
         }
     }
-}
 
-fn draw_shape(gizmos: &mut Gizmos, shape: Shape, pos: Vec2, r: f32, color: Color) {
-    match shape {
-        Shape::Circle => {
-            gizmos.circle_2d(pos, r, color);
-        }
-        Shape::Square => {
-            gizmos.rect_2d(pos, Vec2::splat(r * 1.8), color);
-        }
-        Shape::Triangle => {
-            let a = pos + Vec2::new(0.0, r);
-            let b = pos + Vec2::new(-r * 0.9, -r * 0.7);
-            let c = pos + Vec2::new(r * 0.9, -r * 0.7);
-            gizmos.linestrip_2d([a, b, c, a], color);
+    // Via placement preview.
+    if build.mode == BuildMode::PlacingVia {
+        if let Some(cursor) = cursor_world(&windows, &cam) {
+            gizmos.circle_2d(cursor, VIA_RADIUS, Color::WHITE);
         }
     }
 }
 
-// ---- HUD -------------------------------------------------------------------
+// ---- HUD -----------------------------------------------------------------
 
-/// Updates the score / status text each frame.
 pub fn update_ui(
-    game: Res<Game>,
-    active: Res<ActiveLine>,
+    active: Res<ActiveLayer>,
+    credits: Res<Credits>,
+    build: Res<BuildState>,
     mut q: Query<&mut Text, With<ScoreText>>,
 ) {
-    if let Ok(mut text) = q.single_mut() {
-        if game.phase == Phase::GameOver {
-            text.0 = format!("GAME OVER  —  final score: {}", game.score);
-        } else {
-            text.0 = format!(
-                "Score: {}     Editing line {}  (press 1 / 2 / 3)",
-                game.score,
-                active.0 + 1
-            );
-        }
-    }
+    let Ok(mut text) = q.single_mut() else { return };
+    let mode_hint = match build.mode {
+        BuildMode::Routing             => "drag between nodes to trace  |  V = place via",
+        BuildMode::PlacingDistrict(_)  => "click to place district  |  Esc = cancel",
+        BuildMode::PlacingVia          => "click to place via  |  V / Esc = cancel",
+    };
+    text.0 = format!(
+        "Credits: {:.0}   Layer: {}   (Tab / 1 2 3)   {}",
+        credits.0,
+        active.0.name(),
+        mode_hint,
+    );
 }
 
-// ---- Shared helpers --------------------------------------------------------
+// ---- Helpers -------------------------------------------------------------
 
-/// Converts the cursor position into world-space coordinates, or `None` if the
-/// cursor is outside the window.
 fn cursor_world(
     windows: &Query<&Window>,
     cam: &Query<(&Camera, &GlobalTransform)>,
@@ -460,14 +317,25 @@ fn cursor_world(
     camera.viewport_to_world_2d(cam_t, cursor).ok()
 }
 
-/// Returns the station whose centre is within grabbing distance of `p`.
-fn station_at(
-    stations: &Query<(Entity, &Transform), With<Station>>,
+/// Returns the district or via entity under cursor `p`, preferring districts.
+fn endpoint_at(
+    transforms: &Query<&Transform>,
+    districts: &Query<Entity, With<District>>,
+    vias: &Query<Entity, With<Via>>,
     p: Vec2,
 ) -> Option<Entity> {
-    for (e, t) in stations.iter() {
-        if t.translation.truncate().distance(p) <= STATION_RADIUS + 8.0 {
-            return Some(e);
+    for e in districts.iter() {
+        if let Ok(t) = transforms.get(e) {
+            if t.translation.truncate().distance(p) <= GRAB_RADIUS {
+                return Some(e);
+            }
+        }
+    }
+    for e in vias.iter() {
+        if let Ok(t) = transforms.get(e) {
+            if t.translation.truncate().distance(p) <= VIA_GRAB_RADIUS {
+                return Some(e);
+            }
         }
     }
     None

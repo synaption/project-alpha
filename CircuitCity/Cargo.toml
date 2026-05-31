@@ -9,7 +9,19 @@ name = "circuit-cities"
 path = "main.rs"
 
 [dependencies]
-bevy = "0.18"
+# Use sub-features to avoid pulling in the wayland backend (not available in WSL2).
+# `2d_bevy_render` covers 2D rendering + gizmos; `ui_bevy_render` covers text/UI.
+# Platform is supplied manually: bevy_winit + x11 instead of the default_platform
+# bundle (which would also enable wayland).
+bevy = { version = "0.18", default-features = false, features = [
+    "2d_bevy_render",
+    "ui_bevy_render",
+    "bevy_winit",
+    "x11",
+    "default_font",
+    "multi_threaded",
+    "std",
+] }
 
 # Make debug builds actually playable: optimise dependencies (incl. Bevy)
 # while keeping our own crate quick to recompile.
