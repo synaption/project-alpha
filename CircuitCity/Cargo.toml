@@ -1,0 +1,27 @@
+[package]
+name = "circuit-cities"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+
+[[bin]]
+name = "circuit-cities"
+path = "main.rs"
+
+[dependencies]
+bevy = "0.18"
+
+# Make debug builds actually playable: optimise dependencies (incl. Bevy)
+# while keeping our own crate quick to recompile.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# Lean, fast release binary for shipping the Windows .exe.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
