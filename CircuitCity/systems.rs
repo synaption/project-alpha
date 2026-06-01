@@ -6,6 +6,7 @@ use bevy::prelude::*;
 
 // ---- Constants -----------------------------------------------------------
 
+pub const GRID_SIZE: f32 = 40.0;
 pub const DISTRICT_RADIUS: f32 = 18.0;
 pub const VIA_RADIUS: f32 = 8.0;
 pub const CIRCUIT_RADIUS: f32 = 14.0;   // PowerSource / Ground / Led visual radius
@@ -40,24 +41,20 @@ pub fn setup(mut commands: Commands) {
         ScoreText,
     ));
 
-    // Starting city districts (triangle arrangement).
-    for (i, kind) in [
-        DistrictKind::PowerPlant,
-        DistrictKind::Residential,
-        DistrictKind::DataCenter,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let angle = i as f32 * std::f32::consts::TAU / 3.0 - std::f32::consts::FRAC_PI_2;
-        let pos = Vec2::new(angle.cos() * 200.0, angle.sin() * 200.0);
+    // Starting city districts — grid-aligned positions (GRID_SIZE = 40).
+    for (kind, pos) in [
+        (DistrictKind::PowerPlant,  Vec2::new(  0.0,  240.0)),  // (0,  6)
+        (DistrictKind::Residential, Vec2::new(-200.0, -120.0)), // (-5,-3)
+        (DistrictKind::DataCenter,  Vec2::new( 200.0, -120.0)), // ( 5,-3)
+    ] {
         commands.spawn((District::new(kind), CircuitNode, Transform::from_translation(pos.extend(0.0))));
     }
 
-    // Starting circuit: a PowerSource at the top and a Ground at the bottom.
-    // Connect them with a Power-layer trace and drop an LED in between to emit photons.
-    commands.spawn((PowerSource::new(), CircuitNode, Transform::from_translation(Vec3::new(320.0, 260.0, 0.0))));
-    commands.spawn((Ground, CircuitNode, Transform::from_translation(Vec3::new(320.0, -260.0, 0.0))));
+    // Starting circuit: PowerSource and Ground pre-placed so electrons flow
+    // as soon as the player connects them with a Power-layer trace.
+    // Drop an LED between them to see photons.
+    commands.spawn((PowerSource::new(), CircuitNode, Transform::from_translation(Vec3::new(360.0,  240.0, 0.0))));
+    commands.spawn((Ground,             CircuitNode, Transform::from_translation(Vec3::new(360.0, -240.0, 0.0))));
 }
 
 // ---- Layer switch --------------------------------------------------------
@@ -104,6 +101,9 @@ pub fn build_input(
     }
 
     let Some(cursor) = cursor_world(&windows, &cam) else { return };
+    // Routing uses raw cursor (grab existing nodes by proximity).
+    // Placement uses the grid-snapped position.
+    let snapped = snap_to_grid(cursor);
 
     match build.mode {
         BuildMode::Routing => {
@@ -135,12 +135,12 @@ pub fn build_input(
         BuildMode::PlacingDistrict(kind) => {
             if mouse.just_pressed(MouseButton::Left) {
                 let cost = kind.placement_cost();
-                if credits.0 >= cost as f32 && !too_close(&nodes, cursor) {
+                if credits.0 >= cost as f32 && !too_close(&nodes, snapped) {
                     credits.0 -= cost as f32;
                     commands.spawn((
                         District::new(kind),
                         CircuitNode,
-                        Transform::from_translation(cursor.extend(0.0)),
+                        Transform::from_translation(snapped.extend(0.0)),
                     ));
                 }
             }
@@ -148,22 +148,24 @@ pub fn build_input(
 
         BuildMode::PlacingVia => {
             if mouse.just_pressed(MouseButton::Left) {
-                commands.spawn((
-                    Via { connects: LayerSet::all() },
-                    CircuitNode,
-                    Transform::from_translation(cursor.extend(0.0)),
-                ));
-                build.mode = BuildMode::Routing;
+                if !too_close(&nodes, snapped) {
+                    commands.spawn((
+                        Via { connects: LayerSet::all() },
+                        CircuitNode,
+                        Transform::from_translation(snapped.extend(0.0)),
+                    ));
+                    build.mode = BuildMode::Routing;
+                }
             }
         }
 
         BuildMode::PlacingPowerSource => {
             if mouse.just_pressed(MouseButton::Left) {
-                if !too_close(&nodes, cursor) {
+                if !too_close(&nodes, snapped) {
                     commands.spawn((
                         PowerSource::new(),
                         CircuitNode,
-                        Transform::from_translation(cursor.extend(0.0)),
+                        Transform::from_translation(snapped.extend(0.0)),
                     ));
                     build.mode = BuildMode::Routing;
                 }
@@ -172,11 +174,11 @@ pub fn build_input(
 
         BuildMode::PlacingGround => {
             if mouse.just_pressed(MouseButton::Left) {
-                if !too_close(&nodes, cursor) {
+                if !too_close(&nodes, snapped) {
                     commands.spawn((
                         Ground,
                         CircuitNode,
-                        Transform::from_translation(cursor.extend(0.0)),
+                        Transform::from_translation(snapped.extend(0.0)),
                     ));
                     build.mode = BuildMode::Routing;
                 }
@@ -185,11 +187,11 @@ pub fn build_input(
 
         BuildMode::PlacingLed => {
             if mouse.just_pressed(MouseButton::Left) {
-                if !too_close(&nodes, cursor) {
+                if !too_close(&nodes, snapped) {
                     commands.spawn((
                         Led::new(),
                         CircuitNode,
-                        Transform::from_translation(cursor.extend(0.0)),
+                        Transform::from_translation(snapped.extend(0.0)),
                     ));
                     build.mode = BuildMode::Routing;
                 }
@@ -207,20 +209,26 @@ fn trace_cost(layer: Layer) -> u32 {
 
 // ---- Electron simulation -------------------------------------------------
 
-/// Spawn electrons from every PowerSource onto each outgoing Power-layer trace.
+/// Spawn electrons from every PowerSource — only if a Power-layer path to Ground exists.
 pub fn spawn_electrons(
     time: Res<Time>,
     mut commands: Commands,
     mut sources: Query<(Entity, &mut PowerSource)>,
     traces: Query<(Entity, &Trace)>,
+    grounds: Query<Entity, With<Ground>>,
 ) {
     let dt = time.delta_secs();
+    let trace_snap: Vec<(Entity, Trace)> = traces.iter().map(|(e, t)| (e, *t)).collect();
+
     for (src_entity, mut ps) in sources.iter_mut() {
         ps.timer -= dt;
         if ps.timer > 0.0 { continue; }
         ps.timer = ELECTRON_SPAWN_INTERVAL;
 
-        for (trace_entity, trace) in traces.iter() {
+        // Only emit if there's a complete path to a Ground node.
+        if !can_reach_ground(src_entity, &trace_snap, &grounds) { continue; }
+
+        for &(trace_entity, trace) in &trace_snap {
             if trace.layer != Layer::Power { continue; }
             if trace.from != src_entity && trace.to != src_entity { continue; }
             commands.spawn(Electron {
@@ -366,6 +374,19 @@ pub fn draw(
     grounds: Query<Entity, With<Ground>>,
     leds: Query<(Entity, &Led)>,
 ) {
+    // ── Substrate dot grid ───────────────────────────────────────────────
+    let dot_color = Color::srgb(0.13, 0.14, 0.19);
+    let (hw, hh) = (520.0_f32, 368.0_f32);
+    let mut gx = ((-hw) / GRID_SIZE).ceil() * GRID_SIZE;
+    while gx <= hw {
+        let mut gy = ((-hh) / GRID_SIZE).ceil() * GRID_SIZE;
+        while gy <= hh {
+            gizmos.circle_2d(Vec2::new(gx, gy), 1.5, dot_color);
+            gy += GRID_SIZE;
+        }
+        gx += GRID_SIZE;
+    }
+
     // ── Traces (drawn first so nodes sit on top) ──────────────────────────
     for trace in traces.iter() {
         let Ok(ft) = transforms.get(trace.from) else { continue };
@@ -483,30 +504,16 @@ pub fn draw(
         gizmos.circle_2d(pos, 3.0, c);
     }
 
-    // ── Placement previews ───────────────────────────────────────────────
-    let preview_cursor = cursor_world(&windows, &cam);
-    match build.mode {
-        BuildMode::PlacingVia => {
-            if let Some(c) = preview_cursor {
-                gizmos.circle_2d(c, VIA_RADIUS, Color::WHITE);
-            }
+    // ── Placement previews (snapped to grid) ────────────────────────────
+    if let Some(raw) = cursor_world(&windows, &cam) {
+        let c = snap_to_grid(raw);
+        match build.mode {
+            BuildMode::PlacingVia         => { gizmos.circle_2d(c, VIA_RADIUS,     Color::srgba(1.0,  1.0,  1.0,  0.6 )); }
+            BuildMode::PlacingPowerSource => { gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(0.96, 0.65, 0.14, 0.55)); }
+            BuildMode::PlacingGround      => { gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(0.55, 0.55, 0.55, 0.55)); }
+            BuildMode::PlacingLed         => { gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(1.0,  0.97, 0.25, 0.55)); }
+            _ => {}
         }
-        BuildMode::PlacingPowerSource => {
-            if let Some(c) = preview_cursor {
-                gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(0.96, 0.65, 0.14, 0.5));
-            }
-        }
-        BuildMode::PlacingGround => {
-            if let Some(c) = preview_cursor {
-                gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(0.55, 0.55, 0.55, 0.5));
-            }
-        }
-        BuildMode::PlacingLed => {
-            if let Some(c) = preview_cursor {
-                gizmos.circle_2d(c, CIRCUIT_RADIUS, Color::srgba(1.0, 0.97, 0.25, 0.5));
-            }
-        }
-        _ => {}
     }
 }
 
@@ -544,6 +551,38 @@ fn cursor_world(
     let cursor = window.cursor_position()?;
     let (camera, cam_t) = cam.single().ok()?;
     camera.viewport_to_world_2d(cam_t, cursor).ok()
+}
+
+/// Snap `pos` to the nearest GRID_SIZE-aligned point.
+fn snap_to_grid(pos: Vec2) -> Vec2 {
+    Vec2::new(
+        (pos.x / GRID_SIZE).round() * GRID_SIZE,
+        (pos.y / GRID_SIZE).round() * GRID_SIZE,
+    )
+}
+
+/// BFS from `source` along Power-layer traces; returns true if any Ground is reachable.
+fn can_reach_ground(
+    source: Entity,
+    traces: &[(Entity, Trace)],
+    grounds: &Query<Entity, With<Ground>>,
+) -> bool {
+    let mut visited = vec![source];
+    let mut queue = vec![source];
+    while let Some(node) = queue.pop() {
+        if grounds.get(node).is_ok() { return true; }
+        for &(_, trace) in traces {
+            if trace.layer != Layer::Power { continue; }
+            let next = if trace.from == node { trace.to }
+                       else if trace.to == node { trace.from }
+                       else { continue };
+            if !visited.contains(&next) {
+                visited.push(next);
+                queue.push(next);
+            }
+        }
+    }
+    false
 }
 
 /// Returns the CircuitNode entity closest to `p` within GRAB_RADIUS.
