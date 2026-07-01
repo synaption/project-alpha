@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+import textwrap
 from typing import TYPE_CHECKING
 import tiles as tile_types
 import color
@@ -61,7 +62,8 @@ def _render_ui(console, world: World, player: int, message_log: MessageLog, floo
     if lvl:
         console.print(x=1, y=py + 3, string=f"Lv:{lvl.current_level}  XP:{lvl.current_xp}/{lvl.xp_to_next}", fg=color.WHITE)
 
-    console.print(x=1, y=py + 4, string=f"Dungeon floor: {floor}", fg=color.WHITE)
+    location = "Thornveil" if floor == 0 else f"Dungeon floor: {floor}"
+    console.print(x=1, y=py + 4, string=location, fg=color.WHITE)
 
     message_log.render(console, x=C.MSG_X, y=py, width=C.MSG_WIDTH, height=C.MSG_HEIGHT)
 
@@ -98,6 +100,23 @@ def render_inventory(console, world: World, player: int, title: str) -> None:
             string=f"({letter}) {name.name if name else '?'}",
             fg=color.WHITE,
         )
+
+
+def render_dialog(console, speaker_name: str, lines: list[str], current_line: int) -> None:
+    line = lines[current_line % len(lines)]
+    w, h = 70, 7
+    x = (C.SCREEN_WIDTH - w) // 2
+    y = 28
+    console.draw_frame(
+        x=x, y=y, width=w, height=h,
+        title=f" {speaker_name} ",
+        fg=color.DIALOG_BORDER, bg=color.BLACK,
+    )
+    wrapped = textwrap.wrap(f'"{line}"', w - 4)
+    for i, wline in enumerate(wrapped[:4]):
+        console.print(x=x + 2, y=y + 1 + i, string=wline, fg=color.WHITE)
+    more = f"[{current_line + 1}/{len(lines)}  any key]"
+    console.print(x=x + w - len(more) - 2, y=y + h - 2, string=more, fg=color.GRAY)
 
 
 def render_level_up(console, world: World, player: int) -> None:

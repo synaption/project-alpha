@@ -37,6 +37,34 @@ WALL = new_tile(
     light=(ord("#"), color.WALL_LIGHT_FG, color.WALL_LIGHT_BG),
 )
 
+GRASS = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("."), color.GRASS_DARK_FG, color.GRASS_DARK_BG),
+    light=(ord("."), color.GRASS_LIGHT_FG, color.GRASS_LIGHT_BG),
+)
+
+COBBLESTONE = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("."), color.COBBLE_DARK_FG, color.COBBLE_DARK_BG),
+    light=(ord("."), color.COBBLE_LIGHT_FG, color.COBBLE_LIGHT_BG),
+)
+
+INDOOR_FLOOR = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("."), color.INDOOR_DARK_FG, color.INDOOR_DARK_BG),
+    light=(ord("."), color.INDOOR_LIGHT_FG, color.INDOOR_LIGHT_BG),
+)
+
+DOOR = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("+"), color.DOOR_DARK_FG, color.DOOR_DARK_BG),
+    light=(ord("+"), color.DOOR_LIGHT_FG, color.DOOR_LIGHT_BG),
+)
+
 DOWN_STAIRS = new_tile(
     walkable=True,
     transparent=True,

@@ -39,11 +39,16 @@ World
 ## Game states
 
 ```
-PLAYER_TURN  ──(player acts)──► ENEMY_TURN ──(AI runs)──► PLAYER_TURN
-                                                        └──► PLAYER_DEAD
+PLAYER_TURN  ──(move/attack)──► ENEMY_TURN ──(AI runs)──► PLAYER_TURN
+                                                       └──► PLAYER_DEAD
+PLAYER_TURN  ──(bump villager)──► TALKING ──(any key / ESC)──► PLAYER_TURN
 PLAYER_TURN  ──(opens inv)──► SHOW_INVENTORY ──(ESC)──► PLAYER_TURN
 PLAYER_TURN  ──(levels up)──► LEVEL_UP ──(a/b/c)──► ENEMY_TURN
 ```
+
+TALKING never transitions to ENEMY_TURN — it costs no game time.
+
+`floor == 0` → town (Thornveil, `town_gen.py`). `floor >= 1` → dungeon (`map_gen.py`).
 
 ## Module map
 
@@ -57,6 +62,7 @@ color.py           RGB color constants
 constants.py       Screen/map dimensions, file paths
 game_map.py        GameMap; numpy tile/visibility arrays; entity spatial queries
 map_gen.py         BSP-style procedural dungeon generator
+town_gen.py        Hand-crafted town of Thornveil (floor 0)
 message_log.py     MessageLog; renders the last N messages into a console region
 entity_factories.py  Spawn functions for player, monsters, and items
 systems/

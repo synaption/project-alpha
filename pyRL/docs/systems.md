@@ -68,6 +68,24 @@ All scroll effects that kill enemies call `kill()` + `award_xp()` so XP is award
 
 ---
 
+## town generation — town_gen.generate_town(...)
+[town_gen.py](../town_gen.py)
+
+Generates the hand-crafted starting area (**Thornveil**). The layout is fixed rather than random to give the town a consistent feel. Steps:
+
+1. Fill 80×43 map with `GRASS`.
+2. Carve cobblestone town square and main roads (horizontal + vertical).
+3. Carve side paths from building doors to the main road.
+4. Place five buildings (`_carve_building`: WALL perimeter + INDOOR_FLOOR interior).
+5. Place DOOR tiles on each building's entrance.
+6. Place the dungeon `DOWN_STAIRS` at the south end + a `Stairs(floor=1)` entity.
+7. Set player position to town centre.
+8. Spawn the well and six named villagers.
+
+Called by `Engine._new_floor()` when `floor == 0`.
+
+---
+
 ## map generation — map_gen.generate_dungeon(...)
 [map_gen.py](../map_gen.py)
 

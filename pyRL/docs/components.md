@@ -95,6 +95,22 @@ class Stairs:
 ```
 Placed at the center of the last room. Player presses `>` on the same tile to descend.
 
+## Friendly
+```python
+@dataclass
+class Friendly:
+    pass
+```
+Tag. Bumping into this entity opens dialog instead of attacking. Used on all town villagers.
+
+## Dialog
+```python
+@dataclass
+class Dialog:
+    lines: list[str]
+```
+Holds the conversation lines for an NPC. The engine cycles through them one per key press, then closes the dialog box. Requires `Friendly` to be triggered.
+
 ## Level
 ```python
 @dataclass
@@ -114,8 +130,10 @@ At level 1: 350 XP to advance. At level 2: 500 XP. etc.
 |--------|-----------|
 | Player | Position, Renderable, Fighter, BlocksMovement, Name, Inventory, Level |
 | Orc / Troll | Position, Renderable, Fighter, AI, BlocksMovement, Name |
+| Villager | Position, Renderable, Name, Friendly, Dialog, BlocksMovement |
+| Well | Position, Renderable, Name, BlocksMovement |
 | Consumable item | Position†, Renderable, Name, Item, Consumable |
-| Stairs | Position, Stairs |
+| Stairs / dungeon entrance | Position, Stairs |
 | Corpse | Position, Renderable (char=`%`), Name |
 
 † `Position` is removed when picked up; re-added on drop.

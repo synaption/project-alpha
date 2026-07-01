@@ -5,13 +5,14 @@ import tcod.console
 from world import World
 from game_map import GameMap
 from message_log import MessageLog
-from components import Position, Fighter, Name, AI, Inventory, Item, Consumable, Level, Stairs
+from components import Position, Fighter, Name, AI, Inventory, Item, Consumable, Level, Stairs, Friendly, Dialog
 from systems.combat_system import attack
 from systems.ai_system import run_ai
 from systems.fov_system import update_fov
-from systems.render_system import render_all, render_inventory, render_level_up
+from systems.render_system import render_all, render_inventory, render_level_up, render_dialog
 from entity_factories import spawn_player
 from map_gen import generate_dungeon
+from town_gen import generate_town
 import color
 import constants as C
 
@@ -23,6 +24,7 @@ class GameState(Enum):
     SHOW_INVENTORY = auto()
     DROP_INVENTORY = auto()
     LEVEL_UP = auto()
+    TALKING = auto()
 
 
 MOVE_KEYS: dict[tcod.event.KeySym, tuple[int, int]] = {
@@ -56,29 +58,40 @@ class Engine:
         self.world = World()
         self.message_log = MessageLog()
         self.state = GameState.PLAYER_TURN
-        self.floor = 1
+        self.floor = 0          # 0 = town, 1+ = dungeon
         self.game_map: GameMap | None = None
+
+        self.talking_to: int | None = None
+        self.dialog_line: int = 0
 
         self.player = spawn_player(self.world, 0, 0)
         self._new_floor()
 
         self.message_log.add(
-            "Welcome, adventurer! Press ? for help. Good luck!",
+            "You arrive in Thornveil. The dungeon entrance lies to the south.",
             color.MSG_WELCOME,
         )
 
     # ------------------------------------------------------------------
     def _new_floor(self) -> None:
-        self.game_map = generate_dungeon(
-            world=self.world,
-            player=self.player,
-            floor=self.floor,
-            map_width=C.MAP_WIDTH,
-            map_height=C.MAP_HEIGHT,
-            max_rooms=C.MAX_ROOMS,
-            room_min_size=C.ROOM_MIN_SIZE,
-            room_max_size=C.ROOM_MAX_SIZE,
-        )
+        if self.floor == 0:
+            self.game_map = generate_town(
+                world=self.world,
+                player=self.player,
+                map_width=C.MAP_WIDTH,
+                map_height=C.MAP_HEIGHT,
+            )
+        else:
+            self.game_map = generate_dungeon(
+                world=self.world,
+                player=self.player,
+                floor=self.floor,
+                map_width=C.MAP_WIDTH,
+                map_height=C.MAP_HEIGHT,
+                max_rooms=C.MAX_ROOMS,
+                room_min_size=C.ROOM_MIN_SIZE,
+                room_max_size=C.ROOM_MAX_SIZE,
+            )
         update_fov(self.world, self.game_map, self.player)
 
     # ------------------------------------------------------------------
@@ -90,6 +103,10 @@ class Engine:
             if self.state == GameState.PLAYER_DEAD:
                 if isinstance(event, tcod.event.KeyDown) and event.sym == tcod.event.KeySym.ESCAPE:
                     raise SystemExit(0)
+                continue
+
+            if self.state == GameState.TALKING:
+                self._handle_talking_event(event)
                 continue
 
             if self.state == GameState.SHOW_INVENTORY:
@@ -154,6 +171,9 @@ class Engine:
             return
         target = self.game_map.get_blocking_entity(nx, ny)
         if target is not None:
+            if self.world.has(target, Friendly):
+                self._start_dialog(target)
+                return          # talking does not spend a turn
             if self.world.has(target, Fighter):
                 attack(self.world, self.player, target, self.player, self.message_log, True)
                 self._check_level_up()
@@ -162,6 +182,24 @@ class Engine:
             update_fov(self.world, self.game_map, self.player)
         if self.state != GameState.LEVEL_UP:
             self.state = GameState.ENEMY_TURN
+
+    def _start_dialog(self, entity: int) -> None:
+        self.talking_to = entity
+        self.dialog_line = 0
+        self.state = GameState.TALKING
+
+    def _handle_talking_event(self, event: tcod.event.Event) -> None:
+        if not isinstance(event, tcod.event.KeyDown):
+            return
+        dialog = self.world.get(self.talking_to, Dialog) if self.talking_to is not None else None
+        if dialog is None or event.sym == tcod.event.KeySym.ESCAPE:
+            self.talking_to = None
+            self.state = GameState.PLAYER_TURN
+            return
+        self.dialog_line += 1
+        if self.dialog_line >= len(dialog.lines):
+            self.talking_to = None
+            self.state = GameState.PLAYER_TURN
 
     def _pickup(self) -> None:
         pos = self.world.get(self.player, Position)
@@ -185,8 +223,12 @@ class Engine:
         if stairs is None:
             self.message_log.add("There are no stairs here.", color.INVALID)
             return
-        self.floor += 1
-        self.message_log.add(f"You descend to dungeon level {self.floor}.", color.DESCEND)
+        stair_comp = self.world.get(stairs, Stairs)
+        self.floor = stair_comp.floor if stair_comp else self.floor + 1
+        if self.floor == 1:
+            self.message_log.add("You descend into the dungeon. There's no going back.", color.DESCEND)
+        else:
+            self.message_log.add(f"You descend to dungeon level {self.floor}.", color.DESCEND)
         inv = self.world.get(self.player, Inventory)
         keep = {self.player} | set(inv.items if inv else [])
         for eid in list(self.world.entities):
@@ -198,7 +240,7 @@ class Engine:
 
     def _show_help(self) -> None:
         self.message_log.add(
-            "Arrows/hjklyubn=move  g=get  i=inventory  d=drop  >=stairs  ESC=quit",
+            "Arrows/hjklyubn=move  bump=talk/attack  g=get  i=inventory  d=drop  >=stairs  ESC=quit",
             color.WHITE,
         )
 
@@ -289,7 +331,17 @@ class Engine:
     def render(self, console: tcod.console.Console) -> None:
         render_all(console, self.world, self.game_map, self.player, self.message_log, self.floor)
 
-        if self.state == GameState.SHOW_INVENTORY:
+        if self.state == GameState.TALKING and self.talking_to is not None:
+            dialog = self.world.get(self.talking_to, Dialog)
+            name = self.world.get(self.talking_to, Name)
+            if dialog:
+                render_dialog(
+                    console,
+                    speaker_name=name.name if name else "???",
+                    lines=dialog.lines,
+                    current_line=self.dialog_line,
+                )
+        elif self.state == GameState.SHOW_INVENTORY:
             render_inventory(console, self.world, self.player, "Select an item to use  (ESC to cancel)")
         elif self.state == GameState.DROP_INVENTORY:
             render_inventory(console, self.world, self.player, "Select an item to drop  (ESC to cancel)")
@@ -298,5 +350,5 @@ class Engine:
         elif self.state == GameState.PLAYER_DEAD:
             cx = C.SCREEN_WIDTH // 2
             cy = C.SCREEN_HEIGHT // 2
-            console.print(x=cx - 4, y=cy,     string="YOU DIED",          fg=color.MSG_PLAYER_DIE)
+            console.print(x=cx - 4, y=cy,      string="YOU DIED",          fg=color.MSG_PLAYER_DIE)
             console.print(x=cx - 10, y=cy + 2, string="Press ESC to quit.", fg=color.WHITE)

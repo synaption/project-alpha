@@ -69,6 +69,17 @@ class Stairs:
 
 
 @dataclass
+class Friendly:
+    """Tag: entity cannot be attacked; bumping opens dialog."""
+    pass
+
+
+@dataclass
+class Dialog:
+    lines: list[str]
+
+
+@dataclass
 class Level:
     current_level: int = 1
     current_xp: int = 0

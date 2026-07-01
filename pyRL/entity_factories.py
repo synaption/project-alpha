@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from components import (
     Position, Renderable, Fighter, AI, BlocksMovement,
-    Name, Item, Consumable, Inventory, Level,
+    Name, Item, Consumable, Inventory, Level, Friendly, Dialog,
 )
 import color
 
@@ -42,6 +42,76 @@ def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
             Name("Troll"),
         )
     raise ValueError(f"Unknown monster: {kind!r}")
+
+
+_VILLAGERS = {
+    "innkeeper": (
+        "@", (255, 200, 150), "Mira",
+        [
+            "Welcome to the Rusty Flagon! We don't get many adventurers willing to face the dungeon.",
+            "Stock up on supplies before you go down. Many who enter don't come back.",
+            "If you survive, the first round's on me.",
+        ],
+    ),
+    "merchant": (
+        "@", (150, 200, 255), "Aldric",
+        [
+            "I trade in goods recovered from the dungeon. You'd be surprised what people bring back.",
+            "Word of advice: the deeper you go, the deadlier it gets. Go prepared.",
+            "Orcs on the upper floors are manageable. Trolls... less so.",
+        ],
+    ),
+    "guard": (
+        "@", (200, 200, 200), "Captain Vex",
+        [
+            "The dungeon entrance is south of town. Enter at your own risk — we won't follow.",
+            "We've lost three adventurers this month alone. Good luck, stranger.",
+        ],
+    ),
+    "elder": (
+        "@", (200, 160, 100), "Elder Maren",
+        [
+            "Thornveil was built over these ruins centuries ago. We've learned to live alongside the dungeon.",
+            "The dungeon shifts and changes. No two runs are ever the same — the old maps are useless.",
+            "Seek the stairs down, but don't rush. Patience keeps adventurers alive.",
+        ],
+    ),
+    "child": (
+        "@", (255, 255, 150), "Pip",
+        [
+            "Are you going into the dungeon? Wow! Can I have your stuff if you die?",
+            "I'm gonna be an adventurer when I grow up. Dad says I have to wait until I'm twelve.",
+        ],
+    ),
+    "farmer": (
+        "@", (150, 200, 100), "Gus",
+        [
+            "I used to adventure. Then I took an orc axe to the knee. Settled down after that.",
+            "Tip from a veteran: always keep a health potion. Always.",
+        ],
+    ),
+}
+
+
+def spawn_villager(world: World, x: int, y: int, kind: str) -> int:
+    char, fg, name, lines = _VILLAGERS[kind]
+    return world.create_entity(
+        Position(x, y),
+        Renderable(char, fg, render_order=2),
+        Name(name),
+        Friendly(),
+        Dialog(lines=lines),
+        BlocksMovement(),
+    )
+
+
+def spawn_well(world: World, x: int, y: int) -> int:
+    return world.create_entity(
+        Position(x, y),
+        Renderable("O", (150, 150, 200), render_order=1),
+        Name("Well"),
+        BlocksMovement(),
+    )
 
 
 def spawn_item(world: World, x: int, y: int, kind: str) -> int:

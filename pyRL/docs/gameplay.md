@@ -28,18 +28,41 @@ pip install tcod numpy
 | `Shift+?` | Print key help to message log |
 | `Esc` | Quit |
 
+## Starting in Thornveil
+
+The game begins in the town of **Thornveil**. There are no enemies here. Explore freely, talk to the villagers, and prepare before descending.
+
+The **dungeon entrance** (`>`) is at the south end of the vertical road. Step on it and press `>` to descend. There is no returning to town once you enter the dungeon.
+
+### Villagers
+
+| Name | Location | What they say |
+|------|----------|---------------|
+| Mira | Inside the Inn (left building) | Inn lore, survival tips |
+| Aldric | Inside the Shop (right building) | Item and enemy hints |
+| Captain Vex | South of the Guard House (center) | Dungeon warning |
+| Elder Maren | Town square (west side) | Dungeon history |
+| Pip | Town square (east side) | Enthusiastic child |
+| Gus | Inside House 1 (lower-left) | Retired adventurer tips |
+
+Bump into any villager to open dialog. Press any key to advance lines; `Esc` to close early. Talking does **not** spend a turn.
+
+---
+
 ## The map
 
 ```
-@  You (the player)
+@  You (the player) — or a villager (town only)
 o  Orc
 T  Troll
 %  Corpse
 !  Health potion
 ~  Scroll (color indicates type)
->  Stairs down
+O  Well (decorative, blocks movement)
+>  Dungeon entrance / stairs down
++  Door
 #  Wall
-.  Floor (lit = currently visible, dark = explored)
+.  Floor / grass / cobblestone (lit vs dark)
 ```
 
 Tiles you have never seen are completely black.
