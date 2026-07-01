@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from components import (
     Position, Renderable, Fighter, AI, BlocksMovement,
     Name, Item, Consumable, Inventory, Level, Friendly, Dialog,
+    Needs, VillagerAI, FarmPlot, Speed,
 )
 import color
 
@@ -19,6 +20,7 @@ def spawn_player(world: World, x: int, y: int) -> int:
         Name("Player"),
         Inventory(capacity=26),
         Level(current_level=1),
+        Speed(),
     )
 
 
@@ -31,6 +33,7 @@ def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
             AI(behavior="hostile"),
             BlocksMovement(),
             Name("Orc"),
+            Speed(value=110),   # quick raiders
         )
     if kind == "troll":
         return world.create_entity(
@@ -40,6 +43,7 @@ def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
             AI(behavior="hostile"),
             BlocksMovement(),
             Name("Troll"),
+            Speed(value=85),    # slow, lumbering brutes
         )
     raise ValueError(f"Unknown monster: {kind!r}")
 
@@ -93,16 +97,28 @@ _VILLAGERS = {
 }
 
 
-def spawn_villager(world: World, x: int, y: int, kind: str) -> int:
+def spawn_villager(
+    world: World,
+    x: int,
+    y: int,
+    kind: str,
+    home: tuple[int, int] | None = None,
+    social_spot: tuple[int, int] = (0, 0),
+    role: str = "villager",
+) -> int:
     char, fg, name, lines = _VILLAGERS[kind]
-    return world.create_entity(
+    eid = world.create_entity(
         Position(x, y),
         Renderable(char, fg, render_order=2),
         Name(name),
         Friendly(),
         Dialog(lines=lines),
         BlocksMovement(),
+        Needs(),
+        VillagerAI(role=role, home=home or (x, y), social_spot=social_spot),
+        Speed(),
     )
+    return eid
 
 
 def spawn_well(world: World, x: int, y: int) -> int:
@@ -112,6 +128,10 @@ def spawn_well(world: World, x: int, y: int) -> int:
         Name("Well"),
         BlocksMovement(),
     )
+
+
+def spawn_farm_plot(world: World, x: int, y: int) -> int:
+    return world.create_entity(Position(x, y), FarmPlot())
 
 
 def spawn_item(world: World, x: int, y: int, kind: str) -> int:

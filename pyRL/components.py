@@ -93,3 +93,37 @@ class Level:
     @property
     def needs_level_up(self) -> bool:
         return self.current_xp >= self.xp_to_next
+
+
+@dataclass
+class Speed:
+    """100 = baseline pace. Higher acts more often; see game_clock.action_cost()."""
+    value: int = 100
+    next_turn: float = 0.0   # game_clock time (minutes) this actor may next act
+
+
+@dataclass
+class Needs:
+    """Villager life-sim stats. 0 = satisfied, 100 = urgent, except energy (inverted)."""
+    hunger: float = 20.0
+    energy: float = 80.0    # 100 = fully rested, 0 = exhausted
+    social: float = 80.0    # 100 = content, 0 = lonely
+
+
+@dataclass
+class VillagerAI:
+    """Drives a villager's daily routine: sleep, eat, work, socialize, wander."""
+    role: str                          # "farmer" | "villager"
+    home: tuple[int, int]
+    social_spot: tuple[int, int]
+    work: list[int] = field(default_factory=list)   # FarmPlot entity ids (farmers only)
+    activity: str = "sleeping"         # sleeping|eating|working|socializing|wandering
+    activity_timer: int = 0            # turns remaining committed to eating/socializing
+    wander_target: tuple[int, int] | None = None
+
+
+@dataclass
+class FarmPlot:
+    """A single tillable tile. See systems/farm_system.py for stage constants."""
+    stage: int = 0
+    watered_today: bool = False

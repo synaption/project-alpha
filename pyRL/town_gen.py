@@ -16,8 +16,8 @@ import numpy as np
 from typing import TYPE_CHECKING
 import tiles as tile_types
 from game_map import GameMap
-from components import Position, Stairs
-from entity_factories import spawn_villager, spawn_well
+from components import Position, Stairs, VillagerAI
+from entity_factories import spawn_villager, spawn_well, spawn_farm_plot
 
 if TYPE_CHECKING:
     from world import World
@@ -40,6 +40,12 @@ _SHOP_DOOR  = (68, 13)
 _GUARD_DOOR = (39, 13)
 _HOUSE1_DOOR = (9, 27)
 _HOUSE2_DOOR = (69, 27)
+
+# Gus's farm plots, on the open grass south of House 1.
+_FARM_PLOTS = [(x, y) for y in (37, 38) for x in (5, 6, 7)]
+
+# Where off-duty villagers gather to socialize.
+_SOCIAL_SPOT = (39, 24)
 
 
 def _carve_building(tiles, x: int, y: int, w: int, h: int) -> None:
@@ -91,12 +97,18 @@ def generate_town(world: World, player: int, map_width: int, map_height: int) ->
     # ── well (decorative) ─────────────────────────────────────────────────
     spawn_well(world, 35, 21)
 
+    # ── farmland ──────────────────────────────────────────────────────────
+    farm_plot_ids = [spawn_farm_plot(world, x, y) for x, y in _FARM_PLOTS]
+
     # ── villagers ─────────────────────────────────────────────────────────
-    spawn_villager(world, 10, 7,  "innkeeper")
-    spawn_villager(world, 68, 7,  "merchant")
-    spawn_villager(world, 39, 14, "guard")      # just south of guard house
-    spawn_villager(world, 36, 22, "elder")      # town square west
-    spawn_villager(world, 43, 22, "child")      # town square east
-    spawn_villager(world, 8,  31, "farmer")     # inside house 1
+    spawn_villager(world, 10, 7,  "innkeeper", social_spot=_SOCIAL_SPOT)
+    spawn_villager(world, 68, 7,  "merchant",  social_spot=_SOCIAL_SPOT)
+    spawn_villager(world, 39, 14, "guard",     social_spot=_SOCIAL_SPOT, home=(39, 7))
+    spawn_villager(world, 36, 22, "elder",     social_spot=_SOCIAL_SPOT)
+    spawn_villager(world, 43, 22, "child",     social_spot=_SOCIAL_SPOT)
+    farmer = spawn_villager(
+        world, 8, 31, "farmer", social_spot=_SOCIAL_SPOT, role="farmer",
+    )
+    world.get(farmer, VillagerAI).work = farm_plot_ids
 
     return game_map

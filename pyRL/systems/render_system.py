@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from world import World
     from game_map import GameMap
     from message_log import MessageLog
+    from game_clock import GameClock
     import tcod.console
 
 
@@ -21,31 +22,40 @@ def render_all(
     player: int,
     message_log: MessageLog,
     floor: int,
+    clock: GameClock | None = None,
 ) -> None:
     console.clear()
-    _render_map(console, game_map)
-    _render_entities(console, world, game_map)
-    _render_ui(console, world, player, message_log, floor)
+    light = clock.light_level() if (clock is not None and floor == 0) else 1.0
+    _render_map(console, game_map, light)
+    _render_entities(console, world, game_map, light)
+    _render_ui(console, world, player, message_log, floor, clock)
 
 
-def _render_map(console, game_map: GameMap) -> None:
-    console.rgb[0:game_map.height, 0:game_map.width] = np.select(
+def _render_map(console, game_map: GameMap, light: float = 1.0) -> None:
+    composite = np.select(
         condlist=[game_map.visible, game_map.explored],
         choicelist=[game_map.tiles["light"], game_map.tiles["dark"]],
         default=tile_types.SHROUD,
     )
+    if light < 1.0:
+        composite = composite.copy()
+        dim_mask = game_map.visible
+        composite["fg"][dim_mask] = (composite["fg"][dim_mask] * light).astype(np.uint8)
+        composite["bg"][dim_mask] = (composite["bg"][dim_mask] * light).astype(np.uint8)
+    console.rgb[0:game_map.height, 0:game_map.width] = composite
 
 
-def _render_entities(console, world: World, game_map: GameMap) -> None:
+def _render_entities(console, world: World, game_map: GameMap, light: float = 1.0) -> None:
     for eid, (pos, rend) in sorted(
         world.query(Position, Renderable), key=lambda e: e[1][1].render_order
     ):
         if game_map.in_bounds(pos.x, pos.y) and game_map.visible[pos.y, pos.x]:
             console.rgb["ch"][pos.y, pos.x] = ord(rend.char)
-            console.rgb["fg"][pos.y, pos.x] = rend.fg
+            fg = rend.fg if light >= 1.0 else tuple(int(c * light) for c in rend.fg)
+            console.rgb["fg"][pos.y, pos.x] = fg
 
 
-def _render_ui(console, world: World, player: int, message_log: MessageLog, floor: int) -> None:
+def _render_ui(console, world: World, player: int, message_log: MessageLog, floor: int, clock: GameClock | None = None) -> None:
     py = C.PANEL_Y
     fighter = world.get(player, Fighter)
     if fighter:
@@ -64,6 +74,11 @@ def _render_ui(console, world: World, player: int, message_log: MessageLog, floo
 
     location = "Thornveil" if floor == 0 else f"Dungeon floor: {floor}"
     console.print(x=1, y=py + 4, string=location, fg=color.WHITE)
+
+    if clock is not None:
+        period = "Night" if clock.is_night else "Day"
+        console.print(x=1, y=py + 5, string=f"{clock.time_string()}  ({period})", fg=color.WHITE)
+        console.print(x=1, y=py + 6, string=clock.weekday, fg=color.GRAY)
 
     message_log.render(console, x=C.MSG_X, y=py, width=C.MSG_WIDTH, height=C.MSG_HEIGHT)
 
@@ -102,7 +117,7 @@ def render_inventory(console, world: World, player: int, title: str) -> None:
         )
 
 
-def render_dialog(console, speaker_name: str, lines: list[str], current_line: int) -> None:
+def render_dialog(console, speaker_name: str, lines: list[str], current_line: int, activity: str | None = None) -> None:
     line = lines[current_line % len(lines)]
     w, h = 70, 7
     x = (C.SCREEN_WIDTH - w) // 2
@@ -112,9 +127,14 @@ def render_dialog(console, speaker_name: str, lines: list[str], current_line: in
         title=f" {speaker_name} ",
         fg=color.DIALOG_BORDER, bg=color.BLACK,
     )
+    text_start = y + 1
+    if activity:
+        console.print(x=x + 2, y=y + 1, string=f"({activity})", fg=color.GRAY)
+        text_start += 1
     wrapped = textwrap.wrap(f'"{line}"', w - 4)
-    for i, wline in enumerate(wrapped[:4]):
-        console.print(x=x + 2, y=y + 1 + i, string=wline, fg=color.WHITE)
+    max_lines = y + h - 2 - text_start
+    for i, wline in enumerate(wrapped[:max_lines]):
+        console.print(x=x + 2, y=text_start + i, string=wline, fg=color.WHITE)
     more = f"[{current_line + 1}/{len(lines)}  any key]"
     console.print(x=x + w - len(more) - 2, y=y + h - 2, string=more, fg=color.GRAY)
 

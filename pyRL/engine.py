@@ -4,12 +4,18 @@ import tcod.event
 import tcod.console
 from world import World
 from game_map import GameMap
+from game_clock import GameClock, action_cost, to_calendar_minutes
 from message_log import MessageLog
-from components import Position, Fighter, Name, AI, Inventory, Item, Consumable, Level, Stairs, Friendly, Dialog
+from components import (
+    Position, Fighter, Name, AI, Inventory, Item, Consumable, Level,
+    Stairs, Friendly, Dialog, VillagerAI, Speed,
+)
 from systems.combat_system import attack
-from systems.ai_system import run_ai
+import systems.ai_system as ai_system
+import systems.villager_system as villager_system
 from systems.fov_system import update_fov
 from systems.render_system import render_all, render_inventory, render_level_up, render_dialog
+import systems.farm_system as farm_system
 from entity_factories import spawn_player
 from map_gen import generate_dungeon
 from town_gen import generate_town
@@ -57,6 +63,7 @@ class Engine:
     def __init__(self) -> None:
         self.world = World()
         self.message_log = MessageLog()
+        self.clock = GameClock()
         self.state = GameState.PLAYER_TURN
         self.floor = 0          # 0 = town, 1+ = dungeon
         self.game_map: GameMap | None = None
@@ -93,6 +100,13 @@ class Engine:
                 room_max_size=C.ROOM_MAX_SIZE,
             )
         update_fov(self.world, self.game_map, self.player)
+
+        # Every non-player Speed entity here was just freshly spawned for this floor
+        # (villagers/monsters don't survive a floor change) — sync their schedule to
+        # "now" so they don't burst through a backlog of turns owed since t=0.
+        for eid, (speed,) in self.world.query(Speed):
+            if eid != self.player:
+                speed.next_turn = self.clock.total_minutes
 
     # ------------------------------------------------------------------
     def handle_events(self, events: list) -> None:
@@ -160,9 +174,15 @@ class Engine:
         if sym in MOVE_KEYS:
             dx, dy = MOVE_KEYS[sym]
             if dx == 0 and dy == 0:
+                self._spend_player_turn()
                 self.state = GameState.ENEMY_TURN
                 return
             self._move_or_attack(pos, dx, dy)
+
+    def _spend_player_turn(self) -> None:
+        """Advance the player's own Speed schedule by one action's worth of game-time."""
+        speed = self.world.get(self.player, Speed)
+        speed.next_turn = self.clock.total_minutes + action_cost(speed.value)
 
     def _move_or_attack(self, pos: Position, dx: int, dy: int) -> None:
         nx, ny = pos.x + dx, pos.y + dy
@@ -180,6 +200,7 @@ class Engine:
         else:
             pos.x, pos.y = nx, ny
             update_fov(self.world, self.game_map, self.player)
+        self._spend_player_turn()
         if self.state != GameState.LEVEL_UP:
             self.state = GameState.ENEMY_TURN
 
@@ -216,6 +237,7 @@ class Engine:
         inv.items.append(item_id)
         self.world.remove_component(item_id, Position)
         self.message_log.add(f"You pick up the {name.name if name else 'item'}.", color.WHITE)
+        self._spend_player_turn()
         self.state = GameState.ENEMY_TURN
 
     def _descend(self, pos: Position) -> None:
@@ -277,6 +299,7 @@ class Engine:
                 f"You can't use the {name.name if name else 'item'}.", color.INVALID
             )
         if self.state not in (GameState.LEVEL_UP,):
+            self._spend_player_turn()
             self.state = GameState.ENEMY_TURN
 
     def _drop_item(self, item_id: int) -> None:
@@ -286,17 +309,64 @@ class Engine:
         inv.items.remove(item_id)
         self.world.add_component(item_id, Position(pos.x, pos.y))
         self.message_log.add(f"You drop the {name.name if name else 'item'}.", color.WHITE)
+        self._spend_player_turn()
         self.state = GameState.ENEMY_TURN
 
     # ------------------------------------------------------------------
     def _do_enemy_turn(self) -> None:
-        run_ai(self.world, self.game_map, self.player, self.message_log)
+        player_speed = self.world.get(self.player, Speed)
+        target_time = player_speed.next_turn
+        elapsed = target_time - self.clock.total_minutes
+
+        new_day = self.clock.advance(elapsed)
+        if new_day and self.floor == 0:
+            farm_system.on_new_day(self.world, self.game_map)
+            self.message_log.add(f"A new day dawns. {self.clock.date_string()}", color.MSG_STATUS)
+
+        if self.floor == 0:
+            villager_system.update_needs(self.world, to_calendar_minutes(elapsed))
+
+        self._resolve_npc_turns(target_time)
+
         self.world.flush_dead()
         fighter = self.world.get(self.player, Fighter)
         if fighter and fighter.hp <= 0:
             self.state = GameState.PLAYER_DEAD
         else:
             self.state = GameState.PLAYER_TURN
+
+    def _resolve_npc_turns(self, target_time: float) -> None:
+        """Let every hostile/villager act as many times as their Speed earns them,
+        up to the moment the player is next ready to act (a Qud-style energy queue,
+        expressed directly in game_clock minutes instead of an abstract energy pool)."""
+        while True:
+            eid = self._next_scheduled_npc(target_time)
+            if eid is None:
+                return
+            speed = self.world.get(eid, Speed)
+            if self.world.has(eid, AI):
+                ai_system.act_one(self.world, self.game_map, self.player, self.message_log, eid)
+            else:
+                villager_system.act_one(self.world, self.game_map, self.clock, self.message_log, eid)
+            speed.next_turn += action_cost(speed.value)
+
+    def _next_scheduled_npc(self, target_time: float) -> int | None:
+        best_eid, best_time = None, None
+        for eid, (speed,) in self.world.query(Speed):
+            if eid == self.player:
+                continue
+            ai = self.world.get(eid, AI)
+            if ai is not None:
+                pos = self.world.get(eid, Position)
+                if not ai_system.is_active(self.game_map, pos, ai):
+                    # Frozen off-screen: stay synced to "now" instead of banking turns.
+                    speed.next_turn = max(speed.next_turn, self.clock.total_minutes)
+                    continue
+            elif not self.world.has(eid, VillagerAI):
+                continue
+            if speed.next_turn <= target_time and (best_time is None or speed.next_turn < best_time):
+                best_eid, best_time = eid, speed.next_turn
+        return best_eid
 
     def _check_level_up(self) -> None:
         lvl = self.world.get(self.player, Level)
@@ -329,17 +399,19 @@ class Engine:
 
     # ------------------------------------------------------------------
     def render(self, console: tcod.console.Console) -> None:
-        render_all(console, self.world, self.game_map, self.player, self.message_log, self.floor)
+        render_all(console, self.world, self.game_map, self.player, self.message_log, self.floor, self.clock)
 
         if self.state == GameState.TALKING and self.talking_to is not None:
             dialog = self.world.get(self.talking_to, Dialog)
             name = self.world.get(self.talking_to, Name)
+            villager_ai = self.world.get(self.talking_to, VillagerAI)
             if dialog:
                 render_dialog(
                     console,
                     speaker_name=name.name if name else "???",
                     lines=dialog.lines,
                     current_line=self.dialog_line,
+                    activity=villager_ai.activity if villager_ai else None,
                 )
         elif self.state == GameState.SHOW_INVENTORY:
             render_inventory(console, self.world, self.player, "Select an item to use  (ESC to cancel)")

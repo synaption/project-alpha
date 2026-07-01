@@ -124,16 +124,60 @@ XP threshold: `level_up_base + current_level × level_up_factor`.
 At level 1: 350 XP to advance. At level 2: 500 XP. etc.  
 `needs_level_up` property checks if threshold crossed; engine enters `LEVEL_UP` state.
 
+## Speed
+```python
+@dataclass
+class Speed:
+    value: int = 100
+    next_turn: float = 0.0
+```
+`value` is a Qud-style speed stat (100 = baseline; higher acts more often, lower less). `next_turn` is the `GameClock.total_minutes` timestamp at which this actor is next scheduled to act — maintained by `Engine._resolve_npc_turns`/`_spend_player_turn`. See [architecture.md](architecture.md#turn-scheduling).
+
+## Needs
+```python
+@dataclass
+class Needs:
+    hunger: float = 20.0    # 0 = full, 100 = starving
+    energy: float = 80.0    # 100 = fully rested, 0 = exhausted
+    social: float = 80.0    # 100 = content, 0 = lonely
+```
+Villager life-sim stats. Decayed/restored every turn by `systems/villager_system.update_needs`. Crossing an urgent threshold (see `systems/villager_system.py`) overrides the daily schedule.
+
+## VillagerAI
+```python
+@dataclass
+class VillagerAI:
+    role: str                          # "farmer" | "villager"
+    home: tuple[int, int]
+    social_spot: tuple[int, int]
+    work: list[int] = field(default_factory=list)   # FarmPlot entity ids (farmers only)
+    activity: str = "sleeping"         # sleeping|eating|working|socializing|wandering
+    activity_timer: int = 0            # turns remaining committed to eating/socializing
+    wander_target: tuple[int, int] | None = None
+```
+Drives the daily routine in `systems/villager_system.py`. `home` is where the villager sleeps and eats; `social_spot` is the shared gathering point (town square). Only `role == "farmer"` villagers work `FarmPlot`s.
+
+## FarmPlot
+```python
+@dataclass
+class FarmPlot:
+    stage: int = 0             # UNTILLED..RIPE, see systems/farm_system.py
+    watered_today: bool = False
+```
+One tillable tile. Stage advances `UNTILLED → TILLED → PLANTED → SPROUT → GROWING → RIPE`, one stage per day, only if watered that day. `world.add_component`/`remove_component(FarmPlot entity, Renderable)` toggles whether a crop sprite is drawn above the dirt tile.
+
 ## Component combinations by entity type
 
 | Entity | Components |
 |--------|-----------|
-| Player | Position, Renderable, Fighter, BlocksMovement, Name, Inventory, Level |
-| Orc / Troll | Position, Renderable, Fighter, AI, BlocksMovement, Name |
-| Villager | Position, Renderable, Name, Friendly, Dialog, BlocksMovement |
+| Player | Position, Renderable, Fighter, BlocksMovement, Name, Inventory, Level, Speed |
+| Orc / Troll | Position, Renderable, Fighter, AI, BlocksMovement, Name, Speed |
+| Villager | Position, Renderable, Name, Friendly, Dialog, BlocksMovement, Needs, VillagerAI, Speed |
+| Farm plot | Position, FarmPlot, Renderable† |
 | Well | Position, Renderable, Name, BlocksMovement |
-| Consumable item | Position†, Renderable, Name, Item, Consumable |
+| Consumable item | Position‡, Renderable, Name, Item, Consumable |
 | Stairs / dungeon entrance | Position, Stairs |
 | Corpse | Position, Renderable (char=`%`), Name |
 
-† `Position` is removed when picked up; re-added on drop.
+† Only present once the plot is planted (stage ≥ `PLANTED`).
+‡ `Position` is removed when picked up; re-added on drop.

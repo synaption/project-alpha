@@ -12,19 +12,30 @@ if TYPE_CHECKING:
     from message_log import MessageLog
 
 
-def run_ai(world: World, game_map: GameMap, player: int, message_log: MessageLog) -> None:
+def act_one(world: World, game_map: GameMap, player: int, message_log: MessageLog, eid: int) -> None:
+    """Take one action for a single hostile/confused AI entity (called by the turn scheduler)."""
     from systems.combat_system import attack
 
     player_pos = world.get(player, Position)
-    if player_pos is None:
+    pos = world.get(eid, Position)
+    ai = world.get(eid, AI)
+    if player_pos is None or pos is None or ai is None:
         return
 
-    for eid, (pos, ai) in list(world.query(Position, AI)):
-        if ai.behavior == "confused":
-            _act_confused(world, game_map, player, message_log, eid, pos, ai, attack)
-        elif ai.behavior == "hostile":
-            if game_map.visible[pos.y, pos.x]:
-                _act_hostile(world, game_map, player, player_pos, message_log, eid, pos, attack)
+    if ai.behavior == "confused":
+        _act_confused(world, game_map, player, message_log, eid, pos, ai, attack)
+    elif ai.behavior == "hostile":
+        if game_map.visible[pos.y, pos.x]:
+            _act_hostile(world, game_map, player, player_pos, message_log, eid, pos, attack)
+
+
+def is_active(game_map: GameMap, pos: Position, ai: AI) -> bool:
+    """Whether this AI entity is currently eligible to be scheduled a turn.
+
+    Hostile monsters outside the player's FOV are frozen — they neither act nor
+    accumulate a backlog of owed turns while off-screen.
+    """
+    return ai.behavior != "hostile" or game_map.visible[pos.y, pos.x]
 
 
 def _act_confused(world, game_map, player, message_log, eid, pos, ai, attack_fn) -> None:

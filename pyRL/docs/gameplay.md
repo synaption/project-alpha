@@ -45,7 +45,26 @@ The **dungeon entrance** (`>`) is at the south end of the vertical road. Step on
 | Pip | Town square (east side) | Enthusiastic child |
 | Gus | Inside House 1 (lower-left) | Retired adventurer tips |
 
-Bump into any villager to open dialog. Press any key to advance lines; `Esc` to close early. Talking does **not** spend a turn.
+Bump into any villager to open dialog. Press any key to advance lines; `Esc` to close early. Talking does **not** spend a turn. While talking, the dialog box shows the villager's current activity (e.g. `(sleeping)`, `(working)`) in gray above their line.
+
+### The Reckoning — Thornveil's calendar
+
+Time passes one 10-minute tick per player action. A day is split into named weekdays (Emberday, Stoneday, Wellday, Marketday, Huntday, Restday, Duskday) and the year into four 30-day "tides" — Thaw, Sunhigh, Harvest, Frostveil — dating from the founding of Thornveil over the ruins (currently Year 214 of the Reckoning). The current time and day appear in the left panel; the full date is announced in the message log each dawn.
+
+Dusk falls at 20:00 and dawn breaks at 6:00. Outdoors in Thornveil, visible tiles and villagers dim toward deep night and brighten back up through a 1-hour dawn/dusk ramp. The dungeon is unaffected — it's always torch-lit down there.
+
+### Villager life
+
+Villagers keep a daily routine, tracked by hunger, energy, and social needs: they sleep at home overnight, eat around midday and evening, socialize in the town square in the early evening, and otherwise wander or work. An urgent need (near-starving, exhausted, or lonely) interrupts the schedule early.
+
+Gus the farmer tends a small plot of farmland south of House 1. Farming is a four-step, multi-day cycle:
+
+1. **Till** bare ground into workable dirt.
+2. **Plant** a seed in tilled soil.
+3. **Water** the seed — once per day. A plant only grows on days it was watered.
+4. After three watered days the crop **ripens**; Gus harvests it and the plot returns to tilled soil, ready to replant.
+
+Watch the farm patch over several in-game days to see plots move through seed (`.`) → sprout (`,`) → growing (`"`) → ripe (`Y`).
 
 ---
 
@@ -62,7 +81,10 @@ O  Well (decorative, blocks movement)
 >  Dungeon entrance / stairs down
 +  Door
 #  Wall
-.  Floor / grass / cobblestone (lit vs dark)
+.  Floor / grass / cobblestone / tilled dirt (lit vs dark) — also a planted seed on farmland
+,  Sprouting crop
+"  Growing crop
+Y  Ripe crop, ready to harvest
 ```
 
 Tiles you have never seen are completely black.
@@ -73,12 +95,14 @@ Move into an enemy to attack. All combat is bump-to-attack — there is no separ
 
 **Damage formula:** `max(0, attacker.power − defender.defense)`
 
-| Enemy  | HP | ATK | DEF | XP |
-|--------|-----|-----|-----|----|
-| Orc    | 10  |  3  |  0  | 35 |
-| Troll  | 16  |  4  |  1  | 100 |
+| Enemy  | HP | ATK | DEF | XP | Speed |
+|--------|-----|-----|-----|----|-------|
+| Orc    | 10  |  3  |  0  | 35 | 110 |
+| Troll  | 16  |  4  |  1  | 100 | 85 |
 
-Player starts with HP 30, ATK 5, DEF 2.
+Player starts with HP 30, ATK 5, DEF 2, Speed 100.
+
+Speed governs how often a creature acts, not how hard it hits: at Speed 100 (baseline), one action costs `game_clock.TURN_MINUTES` game-minutes. Orcs (Speed 110) are quick raiders that get an extra action roughly every ten of yours; trolls (Speed 85) are slow brutes that occasionally miss a beat. Watch for it in a crowd — a pack of orcs can close distance faster than their Speed alone suggests, because each one is squeezing in bonus turns.
 
 ## Items
 

@@ -65,6 +65,20 @@ DOOR = new_tile(
     light=(ord("+"), color.DOOR_LIGHT_FG, color.DOOR_LIGHT_BG),
 )
 
+DIRT = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("."), color.DIRT_DARK_FG, color.DIRT_DARK_BG),
+    light=(ord("."), color.DIRT_LIGHT_FG, color.DIRT_LIGHT_BG),
+)
+
+DIRT_WET = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("."), color.DIRT_WET_DARK_FG, color.DIRT_WET_DARK_BG),
+    light=(ord("."), color.DIRT_WET_LIGHT_FG, color.DIRT_WET_LIGHT_BG),
+)
+
 DOWN_STAIRS = new_tile(
     walkable=True,
     transparent=True,
