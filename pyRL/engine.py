@@ -200,6 +200,7 @@ class Engine:
         self.options_return_state = GameState.HOME_MENU
         self.ingame_sections = ["Inventory", "Active Quests", "Maps", "Stats"]
         self.active_quests = ["Find the dungeon entrance south of Thornveil."]
+        self.has_save_file = os.path.exists(C.SAVE_PATH)
         self.settings = dict(DEFAULT_SETTINGS)
 
         self.talking_to: int | None = None
@@ -241,9 +242,11 @@ class Engine:
         else:
             for key, value in DEFAULT_SETTINGS.items():
                 self.settings.setdefault(key, value)
+        if not hasattr(self, "has_save_file"):
+            self.has_save_file = os.path.exists(C.SAVE_PATH)
 
     def _home_menu_items(self) -> list[str]:
-        start = "Continue Adventure" if os.path.exists(C.SAVE_PATH) else "Begin Adventure"
+        start = "Continue Adventure" if self.has_save_file else "Begin Adventure"
         return [start, "Options", "Quit to Desktop"]
 
     def _pause_menu_items(self) -> list[str]:
@@ -1062,12 +1065,14 @@ class Engine:
     def save_game(self, path: str) -> None:
         with open(path, "wb") as f:
             pickle.dump(self, f)
+        self.has_save_file = True
 
     @staticmethod
     def load_game(path: str) -> Engine:
         with open(path, "rb") as f:
             engine = pickle.load(f)
         engine._ensure_runtime_defaults()
+        engine.has_save_file = True
         engine.state = GameState.OPENING
         return engine
 

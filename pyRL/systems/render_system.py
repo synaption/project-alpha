@@ -30,6 +30,7 @@ ENHANCED_GLYPHS = {
     "c": "♞",
     "%": "✝",
 }
+ENHANCED_MAP_GLYPHS = {k: v for k, v in ENHANCED_GLYPHS.items() if k in ".#^A~+><"}
 
 
 def render_all(
@@ -64,7 +65,7 @@ def _render_map(console, game_map: GameMap, light: float = 1.0, tileset_style: s
     )
     if tileset_style == "enhanced":
         composite = composite.copy()
-        for base, styled in ENHANCED_GLYPHS.items():
+        for base, styled in ENHANCED_MAP_GLYPHS.items():
             if styled != base:
                 mask = composite["ch"] == ord(base)
                 composite["ch"][mask] = ord(styled)
