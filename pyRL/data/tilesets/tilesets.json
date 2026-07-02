@@ -1,0 +1,128 @@
+{
+  "default_tileset": "ascii",
+  "aliases": {
+    "enhanced": "enhanced_legacy"
+  },
+  "tilesets": {
+    "ascii": {
+      "name": "ASCII Classic",
+      "source": "Built-in terminal glyphs",
+      "type": "glyph",
+      "scale_rules": {
+        "text_scale_min": 75,
+        "text_scale_max": 200,
+        "tile_scale_min": 75,
+        "tile_scale_max": 150
+      },
+      "default_palette": "classic",
+      "fallback_order": [],
+      "tile_map": {
+        "map.floor": {"tile_name": "dot_floor", "glyph": "."},
+        "map.wall": {"tile_name": "hash_wall", "glyph": "#"},
+        "map.grass": {"tile_name": "dot_grass", "glyph": "."},
+        "map.cobblestone": {"tile_name": "dot_cobble", "glyph": "."},
+        "map.indoor_floor": {"tile_name": "dot_indoor", "glyph": "."},
+        "map.door": {"tile_name": "door_plus", "glyph": "+"},
+        "map.dirt": {"tile_name": "dot_dirt", "glyph": "."},
+        "map.dirt_wet": {"tile_name": "dot_dirt_wet", "glyph": "."},
+        "map.down_stairs": {"tile_name": "stairs_down", "glyph": ">"},
+        "map.up_stairs": {"tile_name": "stairs_up", "glyph": "<"},
+        "map.forest": {"tile_name": "forest_caret", "glyph": "^"},
+        "map.town_entrance": {"tile_name": "town_entrance", "glyph": "A"},
+        "map.water": {"tile_name": "water_wave", "glyph": "~"},
+        "map.mountain": {"tile_name": "mountain", "glyph": "▲"},
+        "entity.player": {"tile_name": "player", "glyph": "@"},
+        "entity.orc": {"tile_name": "orc", "glyph": "o"},
+        "entity.troll": {"tile_name": "troll", "glyph": "T"},
+        "entity.villager": {"tile_name": "villager", "glyph": "@"},
+        "entity.well": {"tile_name": "well", "glyph": "O"},
+        "entity.caravan": {"tile_name": "caravan", "glyph": "c"},
+        "entity.health_potion": {"tile_name": "health_potion", "glyph": "!"},
+        "entity.lightning_scroll": {"tile_name": "lightning_scroll", "glyph": "~"},
+        "entity.fireball_scroll": {"tile_name": "fireball_scroll", "glyph": "~"},
+        "entity.confusion_scroll": {"tile_name": "confusion_scroll", "glyph": "~"},
+        "entity.crop_seed": {"tile_name": "crop_seed", "glyph": "."},
+        "entity.crop_sprout": {"tile_name": "crop_sprout", "glyph": ","},
+        "entity.crop_growing": {"tile_name": "crop_growing", "glyph": "\""},
+        "entity.crop_ripe": {"tile_name": "crop_ripe", "glyph": "Y"}
+      }
+    },
+    "enhanced_legacy": {
+      "name": "Enhanced Legacy",
+      "source": "Legacy unicode substitutions",
+      "type": "glyph",
+      "scale_rules": {
+        "text_scale_min": 75,
+        "text_scale_max": 200,
+        "tile_scale_min": 75,
+        "tile_scale_max": 150
+      },
+      "default_palette": "classic",
+      "fallback_order": ["ascii"],
+      "tile_map": {
+        "map.floor": {"tile_name": "stone_dot", "glyph": "·"},
+        "map.wall": {"tile_name": "wall_block", "glyph": "▓"},
+        "map.forest": {"tile_name": "forest_tree", "glyph": "♣"},
+        "map.town_entrance": {"tile_name": "town_house", "glyph": "⌂"},
+        "map.water": {"tile_name": "water_wave", "glyph": "≈"},
+        "map.door": {"tile_name": "door_heavy", "glyph": "╬"},
+        "map.down_stairs": {"tile_name": "stairs_down", "glyph": "▼"},
+        "map.up_stairs": {"tile_name": "stairs_up", "glyph": "▲"},
+        "entity.player": {"tile_name": "player", "glyph": "☻"},
+        "entity.orc": {"tile_name": "orc", "glyph": "⚉"},
+        "entity.troll": {"tile_name": "troll", "glyph": "♜"},
+        "entity.caravan": {"tile_name": "caravan", "glyph": "♞"},
+        "entity.corpse": {"tile_name": "corpse", "glyph": "✝"}
+      }
+    },
+    "hexany_visual": {
+      "name": "Hexany Roguelike Visual",
+      "source": "Hexany's Roguelike Tiles inspired glyph profile",
+      "type": "glyph",
+      "scale_rules": {
+        "text_scale_min": 100,
+        "text_scale_max": 225,
+        "tile_scale_min": 90,
+        "tile_scale_max": 200
+      },
+      "default_palette": "dawnbringer16",
+      "fallback_order": ["enhanced_legacy", "ascii"],
+      "tile_map": {
+        "map.floor": {"tile_name": "floor_smooth", "glyph": "•"},
+        "map.wall": {"tile_name": "wall_solid", "glyph": "█"},
+        "map.grass": {"tile_name": "grass_blade", "glyph": "·"},
+        "map.cobblestone": {"tile_name": "cobble", "glyph": "◦"},
+        "map.indoor_floor": {"tile_name": "indoor", "glyph": "·"},
+        "map.door": {"tile_name": "door_arch", "glyph": "╪"},
+        "map.dirt": {"tile_name": "dirt", "glyph": "·"},
+        "map.dirt_wet": {"tile_name": "dirt_wet", "glyph": "▪"},
+        "map.down_stairs": {"tile_name": "stairs_down", "glyph": "▾"},
+        "map.up_stairs": {"tile_name": "stairs_up", "glyph": "▴"},
+        "map.forest": {"tile_name": "tree", "glyph": "♠"},
+        "map.town_entrance": {"tile_name": "town_gate", "glyph": "⌂"},
+        "map.water": {"tile_name": "water", "glyph": "∿"},
+        "map.mountain": {"tile_name": "mountain", "glyph": "▲"},
+        "entity.player": {"tile_name": "hero", "glyph": "☺"},
+        "entity.orc": {"tile_name": "orc", "glyph": "ɸ"},
+        "entity.troll": {"tile_name": "troll", "glyph": "ϟ"},
+        "entity.villager": {"tile_name": "villager", "glyph": "☻"},
+        "entity.well": {"tile_name": "well", "glyph": "◉"},
+        "entity.caravan": {"tile_name": "caravan", "glyph": "♘"},
+        "entity.health_potion": {"tile_name": "health_potion", "glyph": "✚"},
+        "entity.lightning_scroll": {"tile_name": "lightning_scroll", "glyph": "⌁"},
+        "entity.fireball_scroll": {"tile_name": "fireball_scroll", "glyph": "⌁"},
+        "entity.confusion_scroll": {"tile_name": "confusion_scroll", "glyph": "⌁"},
+        "entity.crop_seed": {"tile_name": "crop_seed", "glyph": "·"},
+        "entity.crop_sprout": {"tile_name": "crop_sprout", "glyph": "‚"},
+        "entity.crop_growing": {"tile_name": "crop_growing", "glyph": "❞"},
+        "entity.crop_ripe": {"tile_name": "crop_ripe", "glyph": "✿"}
+      }
+    }
+  },
+  "fallback_presets": {
+    "registry_default": [],
+    "ascii_only": ["ascii"],
+    "visual_then_ascii": ["hexany_visual", "enhanced_legacy", "ascii"],
+    "legacy_then_ascii": ["enhanced_legacy", "ascii"]
+  }
+}

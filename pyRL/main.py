@@ -6,14 +6,19 @@ import tcod.context
 import tcod.tileset
 import constants as C
 from engine import Engine
+import visual_registry
 
 
 def main() -> None:
-    tileset = tcod.tileset.load_truetype_font(C.FONT_PATH, C.TILE_SIZE, C.TILE_SIZE)
     if os.path.exists(C.SAVE_PATH):
         engine = Engine.load_game(C.SAVE_PATH)
     else:
         engine = Engine()
+    active_tileset = str(engine.settings.get("active_tileset", "ascii"))
+    text_min, text_max, _, _ = visual_registry.scale_bounds(active_tileset)
+    text_scale = max(text_min, min(text_max, int(engine.settings.get("text_scale", 100))))
+    tile_px = max(8, int(C.TILE_SIZE * text_scale / 100))
+    tileset = tcod.tileset.load_truetype_font(C.FONT_PATH, tile_px, tile_px)
 
     with tcod.context.new(
         columns=C.SCREEN_WIDTH,

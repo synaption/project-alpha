@@ -41,6 +41,8 @@ from town_gen_procedural import generate_town as generate_procedural_town
 from surface_gen import generate_surface_zone
 import color
 import constants as C
+import palette_registry
+import visual_registry
 
 
 DEPTH_WINDOW_RADIUS = 1   # dungeon depths within this many levels of the current one stay active
@@ -55,7 +57,11 @@ DEFAULT_SETTINGS = {
     "master_volume": 80,
     "music_volume": 70,
     "sfx_volume": 75,
-    "tileset_style": "ascii",
+    "active_tileset": "ascii",
+    "tileset_fallback_preset": "registry_default",
+    "text_scale": 100,
+    "tile_scale": 100,
+    "active_palette": "classic",
     "control_scheme": "Keyboard+Mouse",
 }
 
@@ -240,8 +246,31 @@ class Engine:
         if not hasattr(self, "settings"):
             self.settings = dict(DEFAULT_SETTINGS)
         else:
+            if "tileset_style" in self.settings and "active_tileset" not in self.settings:
+                legacy = str(self.settings.pop("tileset_style"))
+                # Legacy saves only had ascii/enhanced. We map enhanced to the
+                # new preferred visual profile while still exposing enhanced_legacy.
+                if legacy == "enhanced":
+                    self.settings["active_tileset"] = "hexany_visual"
+                elif legacy == "ascii":
+                    self.settings["active_tileset"] = "ascii"
+                else:
+                    self.settings["active_tileset"] = visual_registry.normalize_tileset_name(legacy)
             for key, value in DEFAULT_SETTINGS.items():
                 self.settings.setdefault(key, value)
+        self.settings["active_tileset"] = visual_registry.normalize_tileset_name(
+            str(self.settings["active_tileset"])
+        )
+        if self.settings["active_tileset"] not in visual_registry.tileset_names():
+            self.settings["active_tileset"] = "ascii"
+        if self.settings["tileset_fallback_preset"] not in visual_registry.fallback_preset_names():
+            self.settings["tileset_fallback_preset"] = "registry_default"
+        text_min, text_max, tile_min, tile_max = visual_registry.scale_bounds(
+            str(self.settings["active_tileset"])
+        )
+        self.settings["text_scale"] = max(text_min, min(text_max, int(self.settings["text_scale"])))
+        self.settings["tile_scale"] = max(tile_min, min(tile_max, int(self.settings["tile_scale"])))
+        self.settings["active_palette"] = palette_registry.apply_palette(str(self.settings["active_palette"]))
         if not hasattr(self, "has_save_file"):
             self.has_save_file = os.path.exists(C.SAVE_PATH)
 
@@ -505,9 +534,31 @@ class Engine:
             self.settings[key] = max(50, min(150, int(self.settings[key]) + delta * 10))
         elif key in ("master_volume", "music_volume", "sfx_volume"):
             self.settings[key] = max(0, min(100, int(self.settings[key]) + delta * 10))
-        elif key == "tileset_style":
-            self.settings[key] = "enhanced" if self.settings[key] == "ascii" else "ascii"
+        elif key == "active_tileset":
+            names = visual_registry.tileset_names()
+            idx = names.index(self.settings[key])
+            self.settings[key] = names[(idx + delta) % len(names)]
             self.message_log.add(f"Tileset switched to {self.settings[key]}.", color.MSG_STATUS)
+            text_min, text_max, tile_min, tile_max = visual_registry.scale_bounds(str(self.settings[key]))
+            self.settings["text_scale"] = max(text_min, min(text_max, int(self.settings["text_scale"])))
+            self.settings["tile_scale"] = max(tile_min, min(tile_max, int(self.settings["tile_scale"])))
+        elif key == "tileset_fallback_preset":
+            presets = visual_registry.fallback_preset_names()
+            idx = presets.index(self.settings[key])
+            self.settings[key] = presets[(idx + delta) % len(presets)]
+        elif key == "text_scale":
+            text_min, text_max, _, _ = visual_registry.scale_bounds(str(self.settings["active_tileset"]))
+            self.settings[key] = max(text_min, min(text_max, int(self.settings[key]) + delta * 25))
+            self.message_log.add("Text scale will apply after restart.", color.MSG_STATUS)
+        elif key == "tile_scale":
+            _, _, tile_min, tile_max = visual_registry.scale_bounds(str(self.settings["active_tileset"]))
+            self.settings[key] = max(tile_min, min(tile_max, int(self.settings[key]) + delta * 25))
+        elif key == "active_palette":
+            palettes = palette_registry.palette_names()
+            idx = palettes.index(self.settings[key])
+            self.settings[key] = palettes[(idx + delta) % len(palettes)]
+            palette_registry.apply_palette(self.settings[key])
+            self.message_log.add(f"Palette switched to {self.settings[key]}.", color.MSG_STATUS)
         elif key == "control_scheme":
             self.settings[key] = "Controller" if self.settings[key] == "Keyboard+Mouse" else "Keyboard+Mouse"
 
@@ -520,7 +571,11 @@ class Engine:
             "master_volume",
             "music_volume",
             "sfx_volume",
-            "tileset_style",
+            "active_tileset",
+            "tileset_fallback_preset",
+            "text_scale",
+            "tile_scale",
+            "active_palette",
             "controls_menu",
             "control_scheme",
         ]
@@ -1103,7 +1158,9 @@ class Engine:
             self.message_log,
             self.location,
             self.clock,
-            tileset_style=self.settings["tileset_style"],
+            active_tileset=self.settings["active_tileset"],
+            fallback_preset=self.settings["tileset_fallback_preset"],
+            tile_scale=int(self.settings["tile_scale"]),
         )
 
         if self.state == GameState.TALKING and self.talking_to is not None:

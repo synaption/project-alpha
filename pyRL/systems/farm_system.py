@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import tiles as tile_types
 import color
 from components import Position, Renderable, FarmPlot
+import tile_ids as TID
 
 if TYPE_CHECKING:
     from world import World
@@ -23,6 +24,12 @@ _CROP_LOOK = {
     SPROUT: ",",
     GROWING: '"',
     RIPE: "Y",
+}
+_CROP_TILE_ID = {
+    PLANTED: TID.ENTITY_CROP_SEED,
+    SPROUT: TID.ENTITY_CROP_SPROUT,
+    GROWING: TID.ENTITY_CROP_GROWING,
+    RIPE: TID.ENTITY_CROP_RIPE,
 }
 _CROP_COLOR = {
     PLANTED: color.CROP_SEED_FG,
@@ -54,7 +61,15 @@ def plant(world: World, plot_id: int) -> bool:
     if plot is None or plot.stage != TILLED:
         return False
     plot.stage = PLANTED
-    world.add_component(plot_id, Renderable(_CROP_LOOK[PLANTED], _CROP_COLOR[PLANTED], render_order=1))
+    world.add_component(
+        plot_id,
+        Renderable(
+            _CROP_LOOK[PLANTED],
+            _CROP_COLOR[PLANTED],
+            tile_id=_CROP_TILE_ID[PLANTED],
+            render_order=1,
+        ),
+    )
     return True
 
 
@@ -117,6 +132,7 @@ def on_new_day(world: World, game_map: GameMap) -> None:
             if rend:
                 rend.char = _CROP_LOOK[plot.stage]
                 rend.fg = _CROP_COLOR[plot.stage]
+                rend.tile_id = _CROP_TILE_ID[plot.stage]
         plot.watered_today = False
         if plot.stage >= TILLED:
             game_map.tiles[pos.y, pos.x] = tile_types.DIRT

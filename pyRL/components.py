@@ -14,6 +14,7 @@ class Renderable:
     char: str
     fg: tuple[int, int, int]
     bg: tuple[int, int, int] = (0, 0, 0)
+    tile_id: str = ""
     render_order: int = 1  # 0=corpse, 1=item, 2=actor
 
 

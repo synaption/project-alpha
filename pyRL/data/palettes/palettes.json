@@ -1,0 +1,46 @@
+{
+  "default_palette": "classic",
+  "palettes": {
+    "classic": {},
+    "dawnbringer16": {
+      "WHITE": [222, 238, 214],
+      "BLACK": [20, 12, 28],
+      "GRAY": [133, 149, 161],
+      "PLAYER_FG": [222, 238, 214],
+      "ORC_FG": [110, 170, 44],
+      "TROLL_FG": [52, 101, 36],
+      "CORPSE_FG": [172, 50, 50],
+      "HEALTH_POTION_FG": [217, 87, 99],
+      "LIGHTNING_SCROLL_FG": [251, 242, 54],
+      "FIREBALL_SCROLL_FG": [223, 113, 38],
+      "CONFUSION_SCROLL_FG": [118, 66, 138],
+      "WALL_LIGHT_FG": [95, 87, 79],
+      "WALL_LIGHT_BG": [52, 101, 36],
+      "FLOOR_LIGHT_FG": [215, 123, 186],
+      "FLOOR_LIGHT_BG": [48, 52, 109],
+      "WATER_LIGHT_FG": [91, 110, 225],
+      "WATER_LIGHT_BG": [48, 52, 109],
+      "WORLDMAP_CURSOR": [99, 155, 255]
+    },
+    "endesga32": {
+      "WHITE": [244, 244, 244],
+      "BLACK": [16, 16, 16],
+      "GRAY": [130, 130, 130],
+      "PLAYER_FG": [255, 255, 255],
+      "ORC_FG": [78, 155, 83],
+      "TROLL_FG": [48, 104, 80],
+      "CORPSE_FG": [190, 74, 47],
+      "HEALTH_POTION_FG": [204, 109, 167],
+      "LIGHTNING_SCROLL_FG": [251, 242, 54],
+      "FIREBALL_SCROLL_FG": [235, 137, 49],
+      "CONFUSION_SCROLL_FG": [139, 94, 173],
+      "WALL_LIGHT_FG": [120, 120, 120],
+      "WALL_LIGHT_BG": [56, 80, 77],
+      "FLOOR_LIGHT_FG": [233, 190, 120],
+      "FLOOR_LIGHT_BG": [41, 54, 111],
+      "WATER_LIGHT_FG": [82, 98, 176],
+      "WATER_LIGHT_BG": [41, 54, 111],
+      "WORLDMAP_CURSOR": [71, 159, 255]
+    }
+  }
+}

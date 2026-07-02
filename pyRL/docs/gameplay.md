@@ -24,7 +24,7 @@ pip install tcod numpy
 | `g` | Pick up item at your feet |
 | `i` | Open inventory (then press letter to use item) |
 | `d` | Drop item from inventory |
-| `Tab` | Open in-game menu (Inventory / Active Quests / Maps / Stats) |
+| `Tab` | Open in-game menu (Inventory / Active Quests / Maps / Stats; Up/Down changes section) |
 | `>` (Shift+`.`) | Descend dungeon stairs (must be standing on `>`) |
 | `<` (Shift+`,`) | Climb dungeon stairs up (must be standing on `<`) |
 | Walk into a screen edge | Cross to the neighbouring surface screen |
@@ -38,14 +38,18 @@ pip install tcod numpy
 - **Opening screen**: press any key to continue to the home screen.
 - **Home menu**: begin/continue, open options, or quit.
 - **Pause menu** (`Esc` in-game): resume, open in-game menu, open options, save, or quit.
-- **Options menu**: change display mode, brightness, audio levels, tileset style, and control scheme.
+- **Options menu**: change display mode, brightness, audio levels, active tileset, tileset fallback chain preset, text/tile scale, palette pack, and control scheme.
 - **Controls menu**: reference bindings for keyboard/mouse and controller mapping.
 - **In-game menu** (`Tab`): view inventory, active quests, map info, and player stats.
 
-## Tileset styles
+## Tilesets, fallbacks, scaling, and palettes
 
-- `ascii` (default): classic roguelike ASCII-style glyphs.
-- `enhanced`: unicode tile style with richer map/entity symbols.
+- Tilesets are data-driven from `pyRL/data/tilesets/tilesets.json`.
+- Rendering resolves each game tile ID by priority: selected tileset first, then fallback chain preset, then final `ascii` fallback.
+- `hexany_visual` is the preferred non-ASCII profile (Hexany-inspired), while `enhanced_legacy` remains available for compatibility.
+- Text scale controls the font pixel size (applies on restart) to keep high desktop readability.
+- Tile scale controls glyph presentation density for visual tiles.
+- Palette packs are loaded from `pyRL/data/palettes/palettes.json` and can be swapped at runtime.
 
 ## Starting in Thornveil
 

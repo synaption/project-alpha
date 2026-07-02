@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING
 import tiles as tile_types
 import color
 import constants as C
+import palette_registry
+import visual_registry
 from components import Position, Renderable, Fighter, Level, Inventory, Name, Location
+import tile_ids as TID
 
 if TYPE_CHECKING:
     from world import World
@@ -13,24 +16,6 @@ if TYPE_CHECKING:
     from message_log import MessageLog
     from game_clock import GameClock
     import tcod.console
-
-
-ENHANCED_GLYPHS = {
-    ".": "·",
-    "#": "▓",
-    "^": "♣",
-    "A": "⌂",
-    "~": "≈",
-    "+": "╬",
-    ">": "▼",
-    "<": "▲",
-    "@": "☻",
-    "o": "⚉",
-    "T": "♜",
-    "c": "♞",
-    "%": "✝",
-}
-ENHANCED_MAP_GLYPHS = {k: v for k, v in ENHANCED_GLYPHS.items() if k in ".#^A~+><"}
 
 
 def render_all(
@@ -41,52 +26,121 @@ def render_all(
     message_log: MessageLog,
     location: Location,
     clock: GameClock | None = None,
-    tileset_style: str = "ascii",
+    active_tileset: str = "ascii",
+    fallback_preset: str = "registry_default",
+    tile_scale: int = 100,
 ) -> None:
     console.clear()
     outdoors = location.kind == "surface"
     light = clock.light_level() if (clock is not None and outdoors) else 1.0
-    _render_map(console, game_map, light, tileset_style)
-    _render_entities(console, world, game_map, light, tileset_style)
+    _render_map(console, game_map, light, active_tileset, fallback_preset, tile_scale)
+    _render_entities(console, world, game_map, light, active_tileset, fallback_preset, tile_scale)
     _render_ui(console, world, player, message_log, location, clock)
 
 
-def _styled_char(ch: str, tileset_style: str) -> str:
-    if tileset_style != "enhanced":
-        return ch
-    return ENHANCED_GLYPHS.get(ch, ch)
+def _scale_char(ch: str, tile_scale: int) -> str:
+    if tile_scale >= 150:
+        return {
+            ".": "•",
+            "·": "•",
+            ",": "▪",
+            "~": "≈",
+            "▾": "▼",
+            "▴": "▲",
+        }.get(ch, ch)
+    if tile_scale <= 75:
+        return {
+            "•": "·",
+            "█": "▓",
+            "▼": "▾",
+            "▲": "▴",
+        }.get(ch, ch)
+    return ch
 
 
-def _render_map(console, game_map: GameMap, light: float = 1.0, tileset_style: str = "ascii") -> None:
+def _styled_char(
+    ch: str,
+    tile_id: str,
+    active_tileset: str,
+    fallback_preset: str,
+    tile_scale: int,
+) -> str:
+    glyph = visual_registry.resolve_tile_glyph(tile_id, ch, active_tileset, fallback_preset)
+    return _scale_char(glyph, tile_scale)
+
+
+_LEGACY_CHAR_TILE_IDS = {
+    ".": TID.MAP_FLOOR,
+    "#": TID.MAP_WALL,
+    "^": TID.MAP_FOREST,
+    "A": TID.MAP_TOWN_ENTRANCE,
+    "~": TID.MAP_WATER,
+    "+": TID.MAP_DOOR,
+    ">": TID.MAP_DOWN_STAIRS,
+    "<": TID.MAP_UP_STAIRS,
+}
+
+
+def _render_map(
+    console,
+    game_map: GameMap,
+    light: float = 1.0,
+    active_tileset: str = "ascii",
+    fallback_preset: str = "registry_default",
+    tile_scale: int = 100,
+) -> None:
     composite = np.select(
         condlist=[game_map.visible, game_map.explored],
         choicelist=[game_map.tiles["light"], game_map.tiles["dark"]],
         default=tile_types.SHROUD,
     )
-    if tileset_style == "enhanced":
-        composite = composite.copy()
-        for base, styled in ENHANCED_MAP_GLYPHS.items():
-            if styled != base:
-                mask = composite["ch"] == ord(base)
-                composite["ch"][mask] = ord(styled)
+    composite = composite.copy()
+    h, w = game_map.height, game_map.width
+    # Backward compatibility: older saves may have tiles without tile_id.
+    has_tile_id = "tile_id" in composite.dtype.names
+    for y in range(h):
+        for x in range(w):
+            tile_id = composite["tile_id"][y, x] if has_tile_id else ""
+            base_char = chr(int(composite["ch"][y, x]))
+            if not tile_id:
+                tile_id = _LEGACY_CHAR_TILE_IDS.get(base_char, "")
+            styled = base_char if not tile_id else _styled_char(
+                base_char, tile_id, active_tileset, fallback_preset, tile_scale
+            )
+            composite["ch"][y, x] = ord(styled)
     if light < 1.0:
-        composite = composite.copy()
         dim_mask = game_map.visible
         composite["fg"][dim_mask] = (composite["fg"][dim_mask] * light).astype(np.uint8)
         composite["bg"][dim_mask] = (composite["bg"][dim_mask] * light).astype(np.uint8)
+    palette_registry.transform_rgb_array(composite["fg"])
+    palette_registry.transform_rgb_array(composite["bg"])
     console.rgb[0:game_map.height, 0:game_map.width] = composite
 
 
 def _render_entities(
-    console, world: World, game_map: GameMap, light: float = 1.0, tileset_style: str = "ascii"
+    console,
+    world: World,
+    game_map: GameMap,
+    light: float = 1.0,
+    active_tileset: str = "ascii",
+    fallback_preset: str = "registry_default",
+    tile_scale: int = 100,
 ) -> None:
     for eid, (pos, rend) in sorted(
         world.query(Position, Renderable), key=lambda e: e[1][1].render_order
     ):
         if game_map.in_bounds(pos.x, pos.y) and game_map.visible[pos.y, pos.x]:
-            console.rgb["ch"][pos.y, pos.x] = ord(_styled_char(rend.char, tileset_style))
+            console.rgb["ch"][pos.y, pos.x] = ord(
+                _styled_char(
+                    rend.char,
+                    getattr(rend, "tile_id", ""),
+                    active_tileset,
+                    fallback_preset,
+                    tile_scale,
+                )
+            )
             fg = rend.fg if light >= 1.0 else tuple(int(c * light) for c in rend.fg)
-            console.rgb["fg"][pos.y, pos.x] = fg
+            console.rgb["fg"][pos.y, pos.x] = palette_registry.transform_rgb(fg)
 
 
 def _render_ui(console, world: World, player: int, message_log: MessageLog, location: Location, clock: GameClock | None = None) -> None:
@@ -270,23 +324,28 @@ def render_pause_menu(console, items: list[str], selected: int) -> None:
 
 
 def render_options_menu(console, settings: dict[str, object], selected: int) -> None:
-    x, y = _menu_frame(console, " Options ", 64, 19)
+    x, y = _menu_frame(console, " Options ", 72, 22)
     rows = [
         f"Display Mode: {settings['display_mode']}",
         f"Brightness: {settings['brightness']}%",
         f"Master Volume: {settings['master_volume']}%",
         f"Music Volume: {settings['music_volume']}%",
         f"SFX Volume: {settings['sfx_volume']}%",
-        f"Tileset: {settings['tileset_style']}",
+        f"Active Tileset: {settings['active_tileset']}",
+        f"Tileset Fallback: {settings['tileset_fallback_preset']}",
+        f"Text Scale: {settings['text_scale']}%",
+        f"Tile Scale: {settings['tile_scale']}%",
+        f"Palette: {settings['active_palette']}",
         "Controls: open bindings menu",
         f"Control Scheme: {settings['control_scheme']}",
     ]
     for i, row in enumerate(rows):
         fg = color.BLACK if i == selected else color.WHITE
         bg = color.WORLDMAP_CURSOR if i == selected else color.BLACK
-        console.print(x=x + 2, y=y + 2 + i, string=row.ljust(58), fg=fg, bg=bg)
-    console.print(x=x + 2, y=y + 14, string="Left/Right adjust. Enter opens Controls on that row.", fg=color.GRAY)
-    console.print(x=x + 2, y=y + 15, string="Esc returns to previous menu.", fg=color.GRAY)
+        console.print(x=x + 2, y=y + 2 + i, string=row.ljust(66), fg=fg, bg=bg)
+    console.print(x=x + 2, y=y + 17, string="Left/Right adjust. Enter opens Controls on that row.", fg=color.GRAY)
+    console.print(x=x + 2, y=y + 18, string="Text scale applies on restart. Palette updates immediately.", fg=color.GRAY)
+    console.print(x=x + 2, y=y + 19, string="Esc returns to previous menu.", fg=color.GRAY)
 
 
 def render_controls_menu(console, control_scheme: str) -> None:

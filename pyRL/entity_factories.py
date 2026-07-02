@@ -6,6 +6,7 @@ from components import (
     Needs, VillagerAI, FarmPlot, Speed, FactionAgent,
 )
 import color
+import tile_ids as TID
 
 if TYPE_CHECKING:
     from world import World
@@ -20,7 +21,7 @@ def make_player_components(x: int, y: int) -> list[Any]:
     """
     return [
         Position(x, y),
-        Renderable("@", color.PLAYER_FG, render_order=2),
+        Renderable("@", color.PLAYER_FG, tile_id=TID.ENTITY_PLAYER, render_order=2),
         Fighter(max_hp=30, hp=30, defense=2, power=5),
         BlocksMovement(),
         Name("Player"),
@@ -34,7 +35,7 @@ def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
     if kind == "orc":
         return world.create_entity(
             Position(x, y),
-            Renderable("o", color.ORC_FG, render_order=2),
+            Renderable("o", color.ORC_FG, tile_id=TID.ENTITY_ORC, render_order=2),
             Fighter(max_hp=10, hp=10, defense=0, power=3, xp_reward=35),
             AI(behavior="hostile"),
             BlocksMovement(),
@@ -44,7 +45,7 @@ def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
     if kind == "troll":
         return world.create_entity(
             Position(x, y),
-            Renderable("T", color.TROLL_FG, render_order=2),
+            Renderable("T", color.TROLL_FG, tile_id=TID.ENTITY_TROLL, render_order=2),
             Fighter(max_hp=16, hp=16, defense=1, power=4, xp_reward=100),
             AI(behavior="hostile"),
             BlocksMovement(),
@@ -122,7 +123,7 @@ def spawn_villager(
     char, fg, name, lines = _VILLAGERS[kind]
     eid = world.create_entity(
         Position(x, y),
-        Renderable(char, fg, render_order=2),
+        Renderable(char, fg, tile_id=TID.ENTITY_VILLAGER, render_order=2),
         Name(name),
         Friendly(),
         Dialog(lines=lines),
@@ -137,7 +138,7 @@ def spawn_villager(
 def spawn_well(world: World, x: int, y: int) -> int:
     return world.create_entity(
         Position(x, y),
-        Renderable("O", (150, 150, 200), render_order=1),
+        Renderable("O", (150, 150, 200), tile_id=TID.ENTITY_WELL, render_order=1),
         Name("Well"),
         BlocksMovement(),
     )
@@ -150,7 +151,7 @@ def spawn_farm_plot(world: World, x: int, y: int) -> int:
 def spawn_caravan(world: World, x: int, y: int, zone: tuple[int, int], circuit: list) -> int:
     return world.create_entity(
         Position(x, y),
-        Renderable("c", (200, 160, 60), render_order=2),
+        Renderable("c", (200, 160, 60), tile_id=TID.ENTITY_CARAVAN, render_order=2),
         Name("Trading Caravan"),
         FactionAgent(faction="trading_caravan", zone=zone, circuit=list(circuit)),
         Speed(value=60),   # slower than a walking person -- it's hauling goods
@@ -166,25 +167,25 @@ def spawn_item(world: World, x: int, y: int, kind: str) -> int:
     )
     templates = {
         "health_potion": (
-            Renderable("!", color.HEALTH_POTION_FG, render_order=1),
+            Renderable("!", color.HEALTH_POTION_FG, tile_id=TID.ENTITY_HEALTH_POTION, render_order=1),
             Name("Health Potion"),
             Item(use_function=use_health_potion),
             Consumable(),
         ),
         "lightning_scroll": (
-            Renderable("~", color.LIGHTNING_SCROLL_FG, render_order=1),
+            Renderable("~", color.LIGHTNING_SCROLL_FG, tile_id=TID.ENTITY_LIGHTNING_SCROLL, render_order=1),
             Name("Lightning Scroll"),
             Item(use_function=use_lightning_scroll),
             Consumable(),
         ),
         "fireball_scroll": (
-            Renderable("~", color.FIREBALL_SCROLL_FG, render_order=1),
+            Renderable("~", color.FIREBALL_SCROLL_FG, tile_id=TID.ENTITY_FIREBALL_SCROLL, render_order=1),
             Name("Fireball Scroll"),
             Item(use_function=use_fireball_scroll),
             Consumable(),
         ),
         "confusion_scroll": (
-            Renderable("~", color.CONFUSION_SCROLL_FG, render_order=1),
+            Renderable("~", color.CONFUSION_SCROLL_FG, tile_id=TID.ENTITY_CONFUSION_SCROLL, render_order=1),
             Name("Confusion Scroll"),
             Item(use_function=use_confusion_scroll),
             Consumable(),
