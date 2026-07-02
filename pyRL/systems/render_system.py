@@ -15,6 +15,23 @@ if TYPE_CHECKING:
     import tcod.console
 
 
+ENHANCED_GLYPHS = {
+    ".": "·",
+    "#": "▓",
+    "^": "♣",
+    "A": "⌂",
+    "~": "≈",
+    "+": "╬",
+    ">": "▼",
+    "<": "▲",
+    "@": "☻",
+    "o": "⚉",
+    "T": "♜",
+    "c": "♞",
+    "%": "✝",
+}
+
+
 def render_all(
     console: tcod.console.Console,
     world: World,
@@ -36,22 +53,7 @@ def render_all(
 def _styled_char(ch: str, tileset_style: str) -> str:
     if tileset_style != "enhanced":
         return ch
-    replacements = {
-        ".": "·",
-        "#": "▓",
-        "^": "♣",
-        "A": "⌂",
-        "~": "≈",
-        "+": "╬",
-        ">": "▼",
-        "<": "▲",
-        "@": "☻",
-        "o": "⚉",
-        "T": "♜",
-        "c": "♞",
-        "%": "✝",
-    }
-    return replacements.get(ch, ch)
+    return ENHANCED_GLYPHS.get(ch, ch)
 
 
 def _render_map(console, game_map: GameMap, light: float = 1.0, tileset_style: str = "ascii") -> None:
@@ -62,8 +64,7 @@ def _render_map(console, game_map: GameMap, light: float = 1.0, tileset_style: s
     )
     if tileset_style == "enhanced":
         composite = composite.copy()
-        for base in [".", "#", "^", "A", "~", "+", ">", "<"]:
-            styled = _styled_char(base, tileset_style)
+        for base, styled in ENHANCED_GLYPHS.items():
             if styled != base:
                 mask = composite["ch"] == ord(base)
                 composite["ch"][mask] = ord(styled)

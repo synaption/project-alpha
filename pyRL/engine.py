@@ -49,6 +49,15 @@ DEPTH_WINDOW_RADIUS = 1   # dungeon depths within this many levels of the curren
 # (see town_gen_procedural.py) but persist and get their own dungeons exactly
 # like Thornveil does, once visited.
 OTHER_TOWN_SITES = ["greywater", "oakhollow", "saltmarsh"]
+DEFAULT_SETTINGS = {
+    "display_mode": "Windowed",
+    "brightness": 100,
+    "master_volume": 80,
+    "music_volume": 70,
+    "sfx_volume": 75,
+    "tileset_style": "ascii",
+    "control_scheme": "Keyboard+Mouse",
+}
 
 # Every act_one() below shares the same (world, game_map, player, clock,
 # message_log, eid) signature, so the scheduler can dispatch on whichever tag
@@ -191,15 +200,7 @@ class Engine:
         self.options_return_state = GameState.HOME_MENU
         self.ingame_sections = ["Inventory", "Active Quests", "Maps", "Stats"]
         self.active_quests = ["Find the dungeon entrance south of Thornveil."]
-        self.settings = {
-            "display_mode": "Windowed",
-            "brightness": 100,
-            "master_volume": 80,
-            "music_volume": 70,
-            "sfx_volume": 75,
-            "tileset_style": "ascii",
-            "control_scheme": "Keyboard+Mouse",
-        }
+        self.settings = dict(DEFAULT_SETTINGS)
 
         self.talking_to: int | None = None
         self.dialog_line: int = 0
@@ -236,23 +237,10 @@ class Engine:
         if not hasattr(self, "active_quests"):
             self.active_quests = ["Find the dungeon entrance south of Thornveil."]
         if not hasattr(self, "settings"):
-            self.settings = {
-                "display_mode": "Windowed",
-                "brightness": 100,
-                "master_volume": 80,
-                "music_volume": 70,
-                "sfx_volume": 75,
-                "tileset_style": "ascii",
-                "control_scheme": "Keyboard+Mouse",
-            }
+            self.settings = dict(DEFAULT_SETTINGS)
         else:
-            self.settings.setdefault("display_mode", "Windowed")
-            self.settings.setdefault("brightness", 100)
-            self.settings.setdefault("master_volume", 80)
-            self.settings.setdefault("music_volume", 70)
-            self.settings.setdefault("sfx_volume", 75)
-            self.settings.setdefault("tileset_style", "ascii")
-            self.settings.setdefault("control_scheme", "Keyboard+Mouse")
+            for key, value in DEFAULT_SETTINGS.items():
+                self.settings.setdefault(key, value)
 
     def _home_menu_items(self) -> list[str]:
         start = "Continue Adventure" if os.path.exists(C.SAVE_PATH) else "Begin Adventure"
