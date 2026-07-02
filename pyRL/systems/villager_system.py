@@ -7,11 +7,10 @@ unless a need becomes urgent, in which case it takes priority.
 """
 from __future__ import annotations
 import random
-import numpy as np
-import tcod.path
 from typing import TYPE_CHECKING
-from components import Position, Needs, VillagerAI, BlocksMovement, Name
+from components import Position, Needs, VillagerAI, Name
 import systems.farm_system as farm_system
+from systems.pathing import move_toward
 import color
 
 if TYPE_CHECKING:
@@ -56,8 +55,14 @@ def update_needs(world: World, elapsed_minutes: float) -> None:
             needs.hunger = max(0.0, needs.hunger - HUNGER_EAT_RELIEF_PER_MINUTE * elapsed_minutes)
 
 
-def act_one(world: World, game_map: GameMap, clock: GameClock, message_log: MessageLog, eid: int) -> None:
-    """Take one action for a single villager (called by the turn scheduler)."""
+def act_one(
+    world: World, game_map: GameMap, player: int | None, clock: GameClock, message_log: MessageLog, eid: int,
+) -> None:
+    """Take one action for a single villager (called by the turn scheduler).
+
+    `player` is accepted (but unused here) purely so every act_one() in the
+    game shares one signature — see Engine._ACT_ONE_BY_TAG.
+    """
     pos = world.get(eid, Position)
     ai = world.get(eid, VillagerAI)
     needs = world.get(eid, Needs)
@@ -103,9 +108,9 @@ def _decide_activity(ai: VillagerAI, needs: Needs, clock: GameClock) -> None:
 
 def _act(world: World, game_map: GameMap, eid: int, pos: Position, ai: VillagerAI, message_log: MessageLog) -> None:
     if ai.activity in ("sleeping", "eating"):
-        _move_toward(world, game_map, eid, pos, ai.home)
+        move_toward(world, game_map, eid, pos, ai.home)
     elif ai.activity == "socializing":
-        _move_toward(world, game_map, eid, pos, ai.social_spot)
+        move_toward(world, game_map, eid, pos, ai.social_spot)
     elif ai.activity == "working":
         _do_farm_work(world, game_map, eid, pos, ai, message_log)
     else:
@@ -125,7 +130,7 @@ def _do_farm_work(world: World, game_map: GameMap, eid: int, pos: Position, ai: 
             name = world.get(eid, Name)
             message_log.add(f"{name.name if name else 'The farmer'} {farm_system.VERBS[action]}.", color.MSG_STATUS)
     else:
-        _move_toward(world, game_map, eid, pos, (plot_pos.x, plot_pos.y))
+        move_toward(world, game_map, eid, pos, (plot_pos.x, plot_pos.y))
 
 
 def _wander(world: World, game_map: GameMap, eid: int, pos: Position, ai: VillagerAI) -> None:
@@ -133,25 +138,4 @@ def _wander(world: World, game_map: GameMap, eid: int, pos: Position, ai: Villag
         tx = max(0, min(game_map.width - 1, pos.x + random.randint(-3, 3)))
         ty = max(0, min(game_map.height - 1, pos.y + random.randint(-3, 3)))
         ai.wander_target = (tx, ty)
-    _move_toward(world, game_map, eid, pos, ai.wander_target)
-
-
-def _move_toward(world: World, game_map: GameMap, eid: int, pos: Position, target: tuple[int, int]) -> None:
-    tx, ty = target
-    if (pos.x, pos.y) == (tx, ty):
-        return
-
-    cost = np.array(game_map.tiles["walkable"], dtype=np.int8)
-    for bid, (bpos, _) in world.query(Position, BlocksMovement):
-        if bid != eid:
-            cost[bpos.y, bpos.x] += 10
-
-    graph = tcod.path.SimpleGraph(cost=cost, cardinal=2, diagonal=3)
-    pathfinder = tcod.path.Pathfinder(graph)
-    pathfinder.add_root((pos.y, pos.x))
-    path = pathfinder.path_to((ty, tx)).tolist()
-
-    if len(path) > 1:
-        next_y, next_x = path[1]
-        if game_map.get_blocking_entity(next_x, next_y) is None:
-            pos.x, pos.y = next_x, next_y
+    move_toward(world, game_map, eid, pos, ai.wander_target)

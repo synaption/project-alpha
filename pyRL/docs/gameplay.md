@@ -24,7 +24,11 @@ pip install tcod numpy
 | `g` | Pick up item at your feet |
 | `i` | Open inventory (then press letter to use item) |
 | `d` | Drop item from inventory |
-| `>` (Shift+`.`) | Descend stairs (must be standing on `>`) |
+| `>` (Shift+`.`) | Descend dungeon stairs (must be standing on `>`) |
+| `<` (Shift+`,`) | Climb dungeon stairs up (must be standing on `<`) |
+| Walk into a screen edge | Cross to the neighbouring surface screen |
+| `m` | Open the world map (fast-travel) — surface only |
+| `s` | Save game |
 | `Shift+?` | Print key help to message log |
 | `Esc` | Quit |
 
@@ -32,7 +36,21 @@ pip install tcod numpy
 
 The game begins in the town of **Thornveil**. There are no enemies here. Explore freely, talk to the villagers, and prepare before descending.
 
-The **dungeon entrance** (`>`) is at the south end of the vertical road. Step on it and press `>` to descend. There is no returning to town once you enter the dungeon.
+The **dungeon entrance** (`>`) is at the south end of the vertical road; press `>` on it to descend. Thornveil is **ground level** — to leave, just walk off any edge of the screen into the surrounding wilderness.
+
+### Walking the surface
+
+The world above ground is a grid of screens. **Walk off the edge of a screen** and you cross onto the neighbouring one, arriving at the opposite edge — no stairs, no menus. Keep going and you'll reach the wilderness screens between towns, and eventually other towns. Walk to the very edge of the world and you'll be told so; there's nowhere further that way.
+
+Press **`m`** to open the **world map** — a zoomed-out view where each cell is a 3×3 block of screens (Caves-of-Qud style). Move the cursor over a region you've already **discovered** and press Enter to **fast-travel** there; the journey takes in-game time (so time of day advances and towns live on while you travel). You can't fast-travel with an enemy nearby.
+
+### Other towns
+
+Thornveil is one of several towns scattered across the surface. Each sits on its own screen; you reach them by walking (or fast-travelling). Every town has its own dungeon beneath it (a separate dungeon from Thornveil's), its own townsfolk, and — because towns other than Thornveil are procedurally generated — a different layout each seed, though every one is guaranteed an inn, a guard post, a mayor, and a well.
+
+Everything is **persistent within a playthrough**: a screen or dungeon depth is only generated the first time you set foot on it, then holds still. Whatever you leave behind — a cleared room, a dead orc, a dropped scroll, a tilled field — is exactly how you'll find it when you return. The same **seed** always builds the same world, so two players on one seed explore identical maps.
+
+While you're away, the world doesn't fully pause — simulation fades with distance. Monsters and the trading caravan within a screen (or a dungeon level) or so of you keep moving even when you're not on their exact screen; towns you've left keep their clocks running so villager needs and crops catch up when you come back. Only things genuinely far away freeze exactly as you left them.
 
 ### Villagers
 
@@ -66,19 +84,33 @@ Gus the farmer tends a small plot of farmland south of House 1. Farming is a fou
 
 Watch the farm patch over several in-game days to see plots move through seed (`.`) → sprout (`,`) → growing (`"`) → ripe (`Y`).
 
+While you're away — down in a dungeon or off in another region — a town doesn't just pause: the moment you return, villager needs and farm growth are caught up for however much calendar time passed, so a long delve can mean crops have ripened (or the field's rhythm slipped) by the time you're back. Dungeons, by contrast, freeze exactly as you left them once they're far enough behind you.
+
+---
+
+## Saving
+
+Press `s` at any time during your turn to save (this doesn't cost game time). The game auto-loads that save the next time you start it, picking up exactly where you left off — same floors, same villagers, same farm progress, same inventory. There's a single save slot. Because death is permanent (see below), the save is deleted the moment you die — it's there to let you stop and resume one ongoing life, not to undo a bad fight.
+
+Dungeon floors you haven't reached yet are generated from a random seed chosen when you start a new game — so within one playthrough, revisiting an unexplored floor for the first time is still a surprise, even though everything you've already been to stays put.
+
 ---
 
 ## The map
 
 ```
 @  You (the player) — or a villager (town only)
+c  Trading caravan (roams the surface)
 o  Orc
 T  Troll
 %  Corpse
 !  Health potion
-~  Scroll (color indicates type)
+~  Scroll (color indicates type) — or water on the surface
 O  Well (decorative, blocks movement)
->  Dungeon entrance / stairs down
+>  Stairs down (dungeon entrance in a town / deeper in a dungeon)
+<  Stairs up (within a dungeon)
+^  Forest (surface, walkable)
+▲  Mountain (surface, blocks movement)
 +  Door
 #  Wall
 .  Floor / grass / cobblestone / tilled dirt (lit vs dark) — also a planted seed on farmland
@@ -86,6 +118,8 @@ O  Well (decorative, blocks movement)
 "  Growing crop
 Y  Ripe crop, ready to harvest
 ```
+
+Walk off any edge of a surface screen to cross to the next one. Press `m` for the world map.
 
 Tiles you have never seen are completely black.
 
@@ -134,14 +168,15 @@ XP thresholds: `200 + (current_level × 150)`. Level 1→2 costs 350 XP.
 
 ## Death
 
-Death is **permanent**. The game ends and the only option is to quit (`Esc`). Run again for a new procedurally generated dungeon.
+Death is **permanent**. The game ends, the save file is deleted, and the only option is to quit (`Esc`). Start the game again for a new seed and a fresh dungeon.
 
 ## Tips
 
-- The first room is always safe — no monsters spawn there.
+- The first room of every dungeon floor is always safe — no monsters spawn there, and it's also where that floor's up staircase is.
 - Trolls are tough; use scrolls on them before engaging in melee.
 - A confused enemy still attacks if you walk into it.
 - Pick up and hoard health potions; they are your only healing.
 - The fireball scroll damages you too if you're within radius 3.
 - The lightning scroll requires line of sight within 5 tiles — use it early in a fight before the enemy closes the gap.
-- Press `>` only when you're ready; you can't go back up.
+- Cleared floors stay cleared — retreating to a floor you've already fought through is a legitimate way to regroup, since nothing there respawns.
+- Save before doing anything risky; `s` costs no time.

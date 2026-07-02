@@ -85,3 +85,39 @@ DOWN_STAIRS = new_tile(
     dark=(ord(">"), color.FLOOR_DARK_FG, color.FLOOR_DARK_BG),
     light=(ord(">"), color.FLOOR_LIGHT_FG, color.FLOOR_LIGHT_BG),
 )
+
+UP_STAIRS = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("<"), color.FLOOR_DARK_FG, color.FLOOR_DARK_BG),
+    light=(ord("<"), color.FLOOR_LIGHT_FG, color.FLOOR_LIGHT_BG),
+)
+
+# Overworld terrain
+FOREST = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("^"), color.FOREST_DARK_FG, color.FOREST_DARK_BG),
+    light=(ord("^"), color.FOREST_LIGHT_FG, color.FOREST_LIGHT_BG),
+)
+
+TOWN_ENTRANCE = new_tile(
+    walkable=True,
+    transparent=True,
+    dark=(ord("A"), color.TOWN_ENTRANCE_DARK_FG, color.TOWN_ENTRANCE_DARK_BG),
+    light=(ord("A"), color.TOWN_ENTRANCE_LIGHT_FG, color.TOWN_ENTRANCE_LIGHT_BG),
+)
+
+WATER = new_tile(
+    walkable=False,
+    transparent=True,
+    dark=(ord("~"), color.WATER_DARK_FG, color.WATER_DARK_BG),
+    light=(ord("~"), color.WATER_LIGHT_FG, color.WATER_LIGHT_BG),
+)
+
+MOUNTAIN = new_tile(
+    walkable=False,
+    transparent=False,
+    dark=(ord("▲"), color.MOUNTAIN_DARK_FG, color.MOUNTAIN_DARK_BG),
+    light=(ord("▲"), color.MOUNTAIN_LIGHT_FG, color.MOUNTAIN_LIGHT_BG),
+)

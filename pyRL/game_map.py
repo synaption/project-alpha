@@ -17,6 +17,8 @@ class GameMap:
         self.visible = np.full((height, width), fill_value=False, dtype=bool)
         self.explored = np.full((height, width), fill_value=False, dtype=bool)
         self.downstairs_location: tuple[int, int] = (0, 0)
+        self.upstairs_location: tuple[int, int] = (0, 0)
+        self.player_start: tuple[int, int] = (0, 0)   # where to place the player on a fresh visit
 
     def in_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.width and 0 <= y < self.height

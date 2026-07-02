@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import tiles as tile_types
 import color
 import constants as C
-from components import Position, Renderable, Fighter, Level
+from components import Position, Renderable, Fighter, Level, Inventory, Name, Location
 
 if TYPE_CHECKING:
     from world import World
@@ -21,14 +21,17 @@ def render_all(
     game_map: GameMap,
     player: int,
     message_log: MessageLog,
-    floor: int,
+    location: Location,
     clock: GameClock | None = None,
 ) -> None:
     console.clear()
-    light = clock.light_level() if (clock is not None and floor == 0) else 1.0
+    # Dimming applies anywhere outdoors (the surface — wilderness or town zones);
+    # dungeons are always torch-lit.
+    outdoors = location.kind == "surface"
+    light = clock.light_level() if (clock is not None and outdoors) else 1.0
     _render_map(console, game_map, light)
     _render_entities(console, world, game_map, light)
-    _render_ui(console, world, player, message_log, floor, clock)
+    _render_ui(console, world, player, message_log, location, clock)
 
 
 def _render_map(console, game_map: GameMap, light: float = 1.0) -> None:
@@ -55,7 +58,7 @@ def _render_entities(console, world: World, game_map: GameMap, light: float = 1.
             console.rgb["fg"][pos.y, pos.x] = fg
 
 
-def _render_ui(console, world: World, player: int, message_log: MessageLog, floor: int, clock: GameClock | None = None) -> None:
+def _render_ui(console, world: World, player: int, message_log: MessageLog, location: Location, clock: GameClock | None = None) -> None:
     py = C.PANEL_Y
     fighter = world.get(player, Fighter)
     if fighter:
@@ -72,8 +75,11 @@ def _render_ui(console, world: World, player: int, message_log: MessageLog, floo
     if lvl:
         console.print(x=1, y=py + 3, string=f"Lv:{lvl.current_level}  XP:{lvl.current_xp}/{lvl.xp_to_next}", fg=color.WHITE)
 
-    location = "Thornveil" if floor == 0 else f"Dungeon floor: {floor}"
-    console.print(x=1, y=py + 4, string=location, fg=color.WHITE)
+    if location.kind == "surface":
+        location_label = location.site.title() if location.site else "The Wilds"
+    else:
+        location_label = f"{location.site.title()} Depths, level {location.depth}"
+    console.print(x=1, y=py + 4, string=location_label, fg=color.WHITE)
 
     if clock is not None:
         period = "Night" if clock.is_night else "Day"
@@ -99,8 +105,11 @@ def _render_bar(
     console.print(x=x, y=y, string=f"{label}: {current}/{maximum}", fg=color.WHITE)
 
 
-def render_inventory(console, world: World, player: int, title: str) -> None:
-    inv_comp = world.get(player, __import__("components").Inventory)
+def render_inventory(console, world: World, inventory_world: World, player: int, title: str) -> None:
+    """`player`'s Inventory lives on the current floor's world; the carried items
+    themselves live in the separate, floor-independent inventory_world (see
+    Engine.inventory_world) — items must survive moving between floors' Worlds."""
+    inv_comp = world.get(player, Inventory)
     items = inv_comp.items if inv_comp else []
     height = max(3, len(items) + 2)
     x, y, w = 5, 5, 40
@@ -108,13 +117,42 @@ def render_inventory(console, world: World, player: int, title: str) -> None:
     if not items:
         console.print(x=x + 1, y=y + 1, string="(empty)", fg=color.GRAY)
     for i, item_id in enumerate(items):
-        name = world.get(item_id, __import__("components").Name)
+        name = inventory_world.get(item_id, Name)
         letter = chr(ord("a") + i)
         console.print(
             x=x + 1, y=y + 1 + i,
             string=f"({letter}) {name.name if name else '?'}",
             fg=color.WHITE,
         )
+
+
+def render_world_map(console, player_cell, cursor, discovered, town_cells) -> None:
+    """The zoomed-out overworld: one glyph per world cell. Fast-travel screen."""
+    console.clear()
+    ox, oy = 4, 3
+    console.print(x=ox, y=1, string="World Map  —  arrows/hjkl move, Enter travel, Esc/m close", fg=color.WHITE)
+    for cy in range(C.WORLD_CELLS_H):
+        for cx in range(C.WORLD_CELLS_W):
+            cell = (cx, cy)
+            gx, gy = ox + cx * 2, oy + cy
+            if cell == player_cell:
+                ch, fg = "@", color.WORLDMAP_PLAYER
+            elif cell in town_cells:
+                ch, fg = ("A", color.WORLDMAP_TOWN) if cell in discovered else ("?", color.WORLDMAP_UNKNOWN)
+            elif cell in discovered:
+                ch, fg = ".", color.WORLDMAP_KNOWN
+            else:
+                ch, fg = " ", color.WORLDMAP_UNKNOWN
+            bg = color.WORLDMAP_CURSOR if cell == cursor else color.BLACK
+            console.print(x=gx, y=gy, string=ch, fg=fg, bg=bg)
+    site = town_cells.get(cursor)
+    if cursor in discovered and site:
+        label = site.title()
+    elif cursor in discovered:
+        label = "Wilderness"
+    else:
+        label = "Undiscovered"
+    console.print(x=ox, y=oy + C.WORLD_CELLS_H + 1, string=f"Cursor: {label}", fg=color.WHITE)
 
 
 def render_dialog(console, speaker_name: str, lines: list[str], current_line: int, activity: str | None = None) -> None:

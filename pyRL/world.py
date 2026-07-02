@@ -49,6 +49,10 @@ class World:
             if eid in self._alive:
                 yield eid, comp
 
+    def all_components(self, entity: int) -> list[Any]:
+        """Every component instance currently attached to entity, of any type."""
+        return [store[entity] for store in self._components.values() if entity in store]
+
     def delete_entity(self, entity: int) -> None:
         self._alive.discard(entity)
         self._dead.add(entity)

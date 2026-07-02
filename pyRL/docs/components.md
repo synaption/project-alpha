@@ -85,15 +85,28 @@ class Inventory:
     capacity: int
     items: list[int]              # entity IDs of held items
 ```
-Held items have their `Position` component removed (they're not on the map).
+Held item ids refer to entities in `Engine.inventory_world` — a separate `World` from any floor's, so a picked-up item stays valid no matter which floor's `World` is current afterward. See [architecture.md](architecture.md#persistence).
+
+## Location
+```python
+@dataclass(frozen=True)
+class Location:
+    kind: str = "surface"   # "surface" | "dungeon"
+    site: str = ""          # town name (a town surface zone, or that town's dungeon); "" = wilderness
+    depth: int = 0          # dungeon depth within `site`; unused for surface
+    zx: int = 0             # absolute surface zone coord (world cell = zx // ZONES_PER_CELL)
+    zy: int = 0
+```
+The key into `Engine.floors`. Frozen (hashable) so it works as a dict key and pickles trivially. The world is a flat grid of walkable **surface** zones addressed by `(zx, zy)`, plus **dungeon** depths hanging below town zones. A surface zone **is a town** iff `site` is set — town-ness is an `Engine.surface_towns` registry lookup, not a `kind`, so navigation code (edge-walk, LOD, fast-travel, render) sees one uniform `"surface"` and only life-sim code checks `site`. See [architecture.md](architecture.md#the-surface-and-navigation).
 
 ## Stairs
 ```python
 @dataclass
 class Stairs:
-    floor: int                    # destination floor number
+    destination: Location
+    direction: str = "down"       # "down" | "up"
 ```
-Placed at the center of the last room. Player presses `>` on the same tile to descend.
+A transition tile — used only for the vertical (dungeon) axis now that towns are ground level. `destination` is the `Location` it leads to. Every dungeon depth has a `down` entity (to the next depth) and an `up` entity (to the depth above, or the town's surface zone for depth 1). Every town surface zone has a `down` entity (to its own dungeon depth 1). `Engine._use_stairs(pos, direction)` requires the `Stairs` entity at the player's feet to match the requested direction. Moving *between surface zones* is not stairs — you just walk off the edge (`Engine._try_edge_walk`). A depth-1 up-stairs names its town by `site` but emits placeholder `zx/zy=0`; `Engine._canonical_location` resolves it to the town's registered zone before it's used as a `floors` key.
 
 ## Friendly
 ```python
@@ -166,6 +179,18 @@ class FarmPlot:
 ```
 One tillable tile. Stage advances `UNTILLED → TILLED → PLANTED → SPROUT → GROWING → RIPE`, one stage per day, only if watered that day. `world.add_component`/`remove_component(FarmPlot entity, Renderable)` toggles whether a crop sprite is drawn above the dirt tile.
 
+## FactionAgent
+```python
+@dataclass
+class FactionAgent:
+    faction: str                                # "trading_caravan"
+    zone: tuple[int, int] = (0, 0)              # its authoritative current surface zone
+    circuit: list = field(default_factory=list) # [(zx, zy), ...] town zones to visit in order
+    circuit_index: int = 0
+    last_ticked: float = 0.0
+```
+A roaming faction member — currently just the trading caravan. It lives as an ordinary entity in whichever surface zone's `World` it occupies; `systems/faction_system.py` walks it toward the edge leading to `circuit[circuit_index]`, and `Engine._transfer_boundary_factions` ferries it across zone edges. `zone` is kept in sync on spawn and each transfer. `circuit` (a fixed list of town zone coords) lets `act_one` route without the Engine's registry. Guard/raider factions and long-absence projection are deferred. See [architecture.md](architecture.md#the-surface-and-navigation).
+
 ## Component combinations by entity type
 
 | Entity | Components |
@@ -173,10 +198,11 @@ One tillable tile. Stage advances `UNTILLED → TILLED → PLANTED → SPROUT �
 | Player | Position, Renderable, Fighter, BlocksMovement, Name, Inventory, Level, Speed |
 | Orc / Troll | Position, Renderable, Fighter, AI, BlocksMovement, Name, Speed |
 | Villager | Position, Renderable, Name, Friendly, Dialog, BlocksMovement, Needs, VillagerAI, Speed |
+| Faction agent (caravan) | Position, Renderable, Name, FactionAgent, Speed |
 | Farm plot | Position, FarmPlot, Renderable† |
 | Well | Position, Renderable, Name, BlocksMovement |
 | Consumable item | Position‡, Renderable, Name, Item, Consumable |
-| Stairs / dungeon entrance | Position, Stairs |
+| Stairs / transition tile | Position, Stairs |
 | Corpse | Position, Renderable (char=`%`), Name |
 
 † Only present once the plot is planted (stage ≥ `PLANTED`).

@@ -63,9 +63,28 @@ class Inventory:
     items: list[int] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class Location:
+    """Addresses a single persistent floor/map. Used as the key into Engine.floors.
+
+    A surface zone is a walkable ground-level screen at absolute zone coords
+    (zx, zy); the world-map cell it belongs to is (zx // ZONES_PER_CELL, ...).
+    A surface zone *is a town* iff `site` is set (looked up in
+    Engine.surface_towns) — town-ness is a registry property, not a `kind`, so
+    navigation code sees one uniform "surface" kind and only life-sim code
+    checks `site`.
+    """
+    kind: str = "surface"   # "surface" | "dungeon"
+    site: str = ""          # town name (a town surface zone, or that town's dungeon); "" = wilderness
+    depth: int = 0          # dungeon depth within `site`; unused for surface
+    zx: int = 0             # absolute surface zone coord (unused for dungeon)
+    zy: int = 0
+
+
 @dataclass
 class Stairs:
-    floor: int
+    destination: Location
+    direction: str = "down"     # "down" | "up"
 
 
 @dataclass
@@ -127,3 +146,20 @@ class FarmPlot:
     """A single tillable tile. See systems/farm_system.py for stage constants."""
     stage: int = 0
     watered_today: bool = False
+
+
+@dataclass
+class FactionAgent:
+    """A roaming faction member on the surface. See systems/faction_system.py.
+
+    Lives in whichever surface zone's World it currently occupies. `zone` is its
+    authoritative absolute zone coord (kept in sync by the engine on spawn and on
+    each cross-zone transfer); it walks toward `circuit[circuit_index]` and the
+    engine ferries it across zone edges. `circuit` is a fixed list of town zone
+    coords so act_one is self-sufficient without the Engine's town registry.
+    """
+    faction: str                                    # "trading_caravan"
+    zone: tuple[int, int] = (0, 0)
+    circuit: list = field(default_factory=list)     # [(zx, zy), ...] town zones to visit in order
+    circuit_index: int = 0
+    last_ticked: float = 0.0                         # clock.total_minutes at last update

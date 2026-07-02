@@ -16,7 +16,7 @@ import numpy as np
 from typing import TYPE_CHECKING
 import tiles as tile_types
 from game_map import GameMap
-from components import Position, Stairs, VillagerAI
+from components import Position, Stairs, VillagerAI, Location
 from entity_factories import spawn_villager, spawn_well, spawn_farm_plot
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ def _carve_building(tiles, x: int, y: int, w: int, h: int) -> None:
     tiles[y+1:y+h-1, x+1:x+w-1] = tile_types.INDOOR_FLOOR
 
 
-def generate_town(world: World, player: int, map_width: int, map_height: int) -> GameMap:
+def generate_town(world: World, map_width: int, map_height: int) -> GameMap:
     game_map = GameMap(world, map_width, map_height)
 
     # ── base layer ────────────────────────────────────────────────────────
@@ -88,11 +88,16 @@ def generate_town(world: World, player: int, map_width: int, map_height: int) ->
     ex, ey = DUNGEON_ENTRANCE
     game_map.tiles[ey, ex] = tile_types.DOWN_STAIRS
     game_map.downstairs_location = DUNGEON_ENTRANCE
-    world.create_entity(Position(ex, ey), Stairs(floor=1))
+    world.create_entity(
+        Position(ex, ey),
+        Stairs(destination=Location(kind="dungeon", site="thornveil", depth=1), direction="down"),
+    )
+
+    # The town is ground level: you simply walk off any edge into the
+    # surrounding wilderness (Engine._try_edge_walk) — no stairs out.
 
     # ── place player ──────────────────────────────────────────────────────
-    pos = world.get(player, Position)
-    pos.x, pos.y = PLAYER_START
+    game_map.player_start = PLAYER_START
 
     # ── well (decorative) ─────────────────────────────────────────────────
     spawn_well(world, 35, 21)

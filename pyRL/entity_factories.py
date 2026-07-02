@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from components import (
     Position, Renderable, Fighter, AI, BlocksMovement,
     Name, Item, Consumable, Inventory, Level, Friendly, Dialog,
-    Needs, VillagerAI, FarmPlot, Speed,
+    Needs, VillagerAI, FarmPlot, Speed, FactionAgent,
 )
 import color
 
@@ -11,8 +11,14 @@ if TYPE_CHECKING:
     from world import World
 
 
-def spawn_player(world: World, x: int, y: int) -> int:
-    return world.create_entity(
+def make_player_components(x: int, y: int) -> list[Any]:
+    """The player's core components, independent of any floor's World.
+
+    Engine re-registers these same instances into whichever floor's World is
+    current (see Engine._enter_floor) — they aren't owned by any single floor,
+    since the player moves between floors that each have their own World.
+    """
+    return [
         Position(x, y),
         Renderable("@", color.PLAYER_FG, render_order=2),
         Fighter(max_hp=30, hp=30, defense=2, power=5),
@@ -21,7 +27,7 @@ def spawn_player(world: World, x: int, y: int) -> int:
         Inventory(capacity=26),
         Level(current_level=1),
         Speed(),
-    )
+    ]
 
 
 def spawn_monster(world: World, x: int, y: int, kind: str) -> int:
@@ -94,6 +100,13 @@ _VILLAGERS = {
             "Tip from a veteran: always keep a health potion. Always.",
         ],
     ),
+    "mayor": (
+        "@", (220, 190, 90), "the Mayor",
+        [
+            "Welcome, traveler. We keep good relations with Thornveil — safe travels between us.",
+            "This town's seen its share of hardship, but we endure.",
+        ],
+    ),
 }
 
 
@@ -132,6 +145,16 @@ def spawn_well(world: World, x: int, y: int) -> int:
 
 def spawn_farm_plot(world: World, x: int, y: int) -> int:
     return world.create_entity(Position(x, y), FarmPlot())
+
+
+def spawn_caravan(world: World, x: int, y: int, zone: tuple[int, int], circuit: list) -> int:
+    return world.create_entity(
+        Position(x, y),
+        Renderable("c", (200, 160, 60), render_order=2),
+        Name("Trading Caravan"),
+        FactionAgent(faction="trading_caravan", zone=zone, circuit=list(circuit)),
+        Speed(value=60),   # slower than a walking person -- it's hauling goods
+    )
 
 
 def spawn_item(world: World, x: int, y: int, kind: str) -> int:

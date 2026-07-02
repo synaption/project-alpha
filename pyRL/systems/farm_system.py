@@ -120,3 +120,24 @@ def on_new_day(world: World, game_map: GameMap) -> None:
         plot.watered_today = False
         if plot.stage >= TILLED:
             game_map.tiles[pos.y, pos.x] = tile_types.DIRT
+
+
+def catch_up_day(world: World, game_map: GameMap) -> None:
+    """Abstract one full day of farm work for every plot at once.
+
+    Called once per elapsed calendar day when the player returns to town after
+    being away (see Engine._catch_up_town) — there's no one to simulate Gus's
+    individual daily visits turn-by-turn while unobserved, so this assumes he
+    tends every plot that needs it (tills, plants, waters, or harvests, one
+    action per plot) before the day rolls over.
+    """
+    for plot_id, (plot, pos) in list(world.query(FarmPlot, Position)):
+        if plot.stage == UNTILLED:
+            till(world, game_map, plot_id)
+        elif plot.stage == TILLED:
+            plant(world, plot_id)
+        elif plot.stage == RIPE:
+            harvest(world, plot_id)
+        elif not plot.watered_today:
+            water(world, game_map, plot_id)
+    on_new_day(world, game_map)

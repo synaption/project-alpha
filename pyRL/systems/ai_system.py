@@ -1,31 +1,45 @@
 from __future__ import annotations
 import random
-import numpy as np
-import tcod.path
 from typing import TYPE_CHECKING
-from components import Position, AI, Fighter, BlocksMovement, Name
+from components import Position, AI, Name
+from systems.pathing import move_toward
 import color
 
 if TYPE_CHECKING:
     from world import World
     from game_map import GameMap
+    from game_clock import GameClock
     from message_log import MessageLog
 
 
-def act_one(world: World, game_map: GameMap, player: int, message_log: MessageLog, eid: int) -> None:
-    """Take one action for a single hostile/confused AI entity (called by the turn scheduler)."""
+def act_one(
+    world: World, game_map: GameMap, player: int | None, clock: GameClock, message_log: MessageLog, eid: int,
+) -> None:
+    """Take one action for a single hostile/confused AI entity (called by the turn scheduler).
+
+    `player` is None when this entity's floor is active (within the dungeon
+    depth window) but isn't the floor the player is actually standing on — the
+    player entity only ever exists in the current floor's World (see
+    Engine._enter_floor), so there's nothing to chase or attack. Confused
+    entities still wander in that case; hostiles just stay put and wait.
+
+    `clock` is accepted (but unused here) purely to give every act_one() in
+    the game the same signature, so Engine's scheduler can dispatch to
+    whichever system an entity belongs to without a special case per kind —
+    see Engine._ACT_ONE_BY_TAG.
+    """
     from systems.combat_system import attack
 
-    player_pos = world.get(player, Position)
     pos = world.get(eid, Position)
     ai = world.get(eid, AI)
-    if player_pos is None or pos is None or ai is None:
+    if pos is None or ai is None:
         return
 
     if ai.behavior == "confused":
         _act_confused(world, game_map, player, message_log, eid, pos, ai, attack)
     elif ai.behavior == "hostile":
-        if game_map.visible[pos.y, pos.x]:
+        player_pos = world.get(player, Position) if player is not None else None
+        if player_pos is not None and game_map.visible[pos.y, pos.x]:
             _act_hostile(world, game_map, player, player_pos, message_log, eid, pos, attack)
 
 
@@ -65,19 +79,4 @@ def _act_hostile(world, game_map, player, player_pos, message_log, eid, pos, att
     if dist <= 1:
         attack_fn(world, eid, player, player, message_log, is_player_attacker=False)
         return
-
-    # Build cost array, inflating cells occupied by other blockers
-    cost = np.array(game_map.tiles["walkable"], dtype=np.int8)
-    for bid, (bpos, _) in world.query(Position, BlocksMovement):
-        if bid != eid and bid != player:
-            cost[bpos.y, bpos.x] += 10
-
-    graph = tcod.path.SimpleGraph(cost=cost, cardinal=2, diagonal=3)
-    pathfinder = tcod.path.Pathfinder(graph)
-    pathfinder.add_root((pos.y, pos.x))
-    path = pathfinder.path_to((player_pos.y, player_pos.x)).tolist()
-
-    if len(path) > 1:
-        next_y, next_x = path[1]
-        if game_map.get_blocking_entity(next_x, next_y) is None:
-            pos.x, pos.y = next_x, next_y
+    move_toward(world, game_map, eid, pos, (player_pos.x, player_pos.y), exclude=(player,))

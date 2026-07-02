@@ -1,3 +1,4 @@
+import os
 import tcod
 import tcod.event
 import tcod.console
@@ -9,7 +10,10 @@ from engine import Engine
 
 def main() -> None:
     tileset = tcod.tileset.load_truetype_font(C.FONT_PATH, C.TILE_SIZE, C.TILE_SIZE)
-    engine = Engine()
+    if os.path.exists(C.SAVE_PATH):
+        engine = Engine.load_game(C.SAVE_PATH)
+    else:
+        engine = Engine()
 
     with tcod.context.new(
         columns=C.SCREEN_WIDTH,
