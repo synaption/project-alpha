@@ -153,9 +153,10 @@ python main.py
 | `g` | Pick up item |
 | `i` | Open inventory |
 | `d` | Drop item |
+| `Tab` | Open in-game menu |
 | `>` | Descend stairs |
 | `v` | View message history |
-| `Esc` | Quit |
+| `Esc` | Open pause menu |
 
 ## References
 

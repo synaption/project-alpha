@@ -20,7 +20,19 @@ import systems.ai_system as ai_system
 import systems.villager_system as villager_system
 import systems.faction_system as faction_system
 from systems.fov_system import update_fov
-from systems.render_system import render_all, render_inventory, render_level_up, render_dialog, render_world_map
+from systems.render_system import (
+    render_all,
+    render_inventory,
+    render_level_up,
+    render_dialog,
+    render_world_map,
+    render_opening_screen,
+    render_home_menu,
+    render_pause_menu,
+    render_options_menu,
+    render_controls_menu,
+    render_ingame_menu,
+)
 import systems.farm_system as farm_system
 from entity_factories import make_player_components, spawn_caravan
 from map_gen import generate_dungeon
@@ -91,6 +103,8 @@ def _build_surface_towns(seed: int) -> dict[tuple[int, int], str]:
 
 
 class GameState(Enum):
+    OPENING = auto()
+    HOME_MENU = auto()
     PLAYER_TURN = auto()
     ENEMY_TURN = auto()
     PLAYER_DEAD = auto()
@@ -99,6 +113,10 @@ class GameState(Enum):
     LEVEL_UP = auto()
     TALKING = auto()
     WORLD_MAP = auto()
+    PAUSE_MENU = auto()
+    OPTIONS_MENU = auto()
+    CONTROLS_MENU = auto()
+    INGAME_MENU = auto()
 
 
 MOVE_KEYS: dict[tcod.event.KeySym, tuple[int, int]] = {
@@ -164,8 +182,24 @@ class Engine:
 
         self.message_log = MessageLog()
         self.clock = GameClock()
-        self.state = GameState.PLAYER_TURN
+        self.state = GameState.OPENING
         self.location: Location = self._surface_location_at(*self.town_zone["thornveil"])
+        self.home_menu_index = 0
+        self.pause_menu_index = 0
+        self.options_menu_index = 0
+        self.ingame_menu_index = 0
+        self.options_return_state = GameState.HOME_MENU
+        self.ingame_sections = ["Inventory", "Active Quests", "Maps", "Stats"]
+        self.active_quests = ["Find the dungeon entrance south of Thornveil."]
+        self.settings = {
+            "display_mode": "Windowed",
+            "brightness": 100,
+            "master_volume": 80,
+            "music_volume": 70,
+            "sfx_volume": 75,
+            "tileset_style": "ascii",
+            "control_scheme": "Keyboard+Mouse",
+        }
 
         self.talking_to: int | None = None
         self.dialog_line: int = 0
@@ -184,6 +218,48 @@ class Engine:
             "You arrive in Thornveil. The dungeon entrance lies to the south.",
             color.MSG_WELCOME,
         )
+        self._ensure_runtime_defaults()
+
+    def _ensure_runtime_defaults(self) -> None:
+        if not hasattr(self, "home_menu_index"):
+            self.home_menu_index = 0
+        if not hasattr(self, "pause_menu_index"):
+            self.pause_menu_index = 0
+        if not hasattr(self, "options_menu_index"):
+            self.options_menu_index = 0
+        if not hasattr(self, "ingame_menu_index"):
+            self.ingame_menu_index = 0
+        if not hasattr(self, "options_return_state"):
+            self.options_return_state = GameState.HOME_MENU
+        if not hasattr(self, "ingame_sections"):
+            self.ingame_sections = ["Inventory", "Active Quests", "Maps", "Stats"]
+        if not hasattr(self, "active_quests"):
+            self.active_quests = ["Find the dungeon entrance south of Thornveil."]
+        if not hasattr(self, "settings"):
+            self.settings = {
+                "display_mode": "Windowed",
+                "brightness": 100,
+                "master_volume": 80,
+                "music_volume": 70,
+                "sfx_volume": 75,
+                "tileset_style": "ascii",
+                "control_scheme": "Keyboard+Mouse",
+            }
+        else:
+            self.settings.setdefault("display_mode", "Windowed")
+            self.settings.setdefault("brightness", 100)
+            self.settings.setdefault("master_volume", 80)
+            self.settings.setdefault("music_volume", 70)
+            self.settings.setdefault("sfx_volume", 75)
+            self.settings.setdefault("tileset_style", "ascii")
+            self.settings.setdefault("control_scheme", "Keyboard+Mouse")
+
+    def _home_menu_items(self) -> list[str]:
+        start = "Continue Adventure" if os.path.exists(C.SAVE_PATH) else "Begin Adventure"
+        return [start, "Options", "Quit to Desktop"]
+
+    def _pause_menu_items(self) -> list[str]:
+        return ["Resume", "In-Game Menu", "Options", "Save Game", "Quit to Desktop"]
 
     # ------------------------------------------------------------------
     def _surface_location_at(self, zx: int, zy: int) -> Location:
@@ -323,9 +399,33 @@ class Engine:
             if isinstance(event, tcod.event.Quit):
                 raise SystemExit(0)
 
+            if self.state == GameState.OPENING:
+                self._handle_opening_event(event)
+                continue
+
+            if self.state == GameState.HOME_MENU:
+                self._handle_home_menu_event(event)
+                continue
+
             if self.state == GameState.PLAYER_DEAD:
                 if isinstance(event, tcod.event.KeyDown) and event.sym == tcod.event.KeySym.ESCAPE:
                     raise SystemExit(0)
+                continue
+
+            if self.state == GameState.PAUSE_MENU:
+                self._handle_pause_menu_event(event)
+                continue
+
+            if self.state == GameState.OPTIONS_MENU:
+                self._handle_options_menu_event(event)
+                continue
+
+            if self.state == GameState.CONTROLS_MENU:
+                self._handle_controls_menu_event(event)
+                continue
+
+            if self.state == GameState.INGAME_MENU:
+                self._handle_ingame_menu_event(event)
                 continue
 
             if self.state == GameState.TALKING:
@@ -355,12 +455,130 @@ class Engine:
             self._do_enemy_turn()
 
     # ------------------------------------------------------------------
+    def _handle_opening_event(self, event: tcod.event.Event) -> None:
+        if isinstance(event, (tcod.event.KeyDown, tcod.event.MouseButtonDown)):
+            self.state = GameState.HOME_MENU
+
+    def _handle_home_menu_event(self, event: tcod.event.Event) -> None:
+        if not isinstance(event, tcod.event.KeyDown):
+            return
+        items = self._home_menu_items()
+        if event.sym == tcod.event.KeySym.UP:
+            self.home_menu_index = (self.home_menu_index - 1) % len(items)
+            return
+        if event.sym == tcod.event.KeySym.DOWN:
+            self.home_menu_index = (self.home_menu_index + 1) % len(items)
+            return
+        if event.sym not in (tcod.event.KeySym.RETURN, tcod.event.KeySym.KP_ENTER):
+            return
+        if self.home_menu_index == 0:
+            self.state = GameState.PLAYER_TURN
+        elif self.home_menu_index == 1:
+            self.options_return_state = GameState.HOME_MENU
+            self.state = GameState.OPTIONS_MENU
+        else:
+            raise SystemExit(0)
+
+    def _handle_pause_menu_event(self, event: tcod.event.Event) -> None:
+        if not isinstance(event, tcod.event.KeyDown):
+            return
+        items = self._pause_menu_items()
+        if event.sym == tcod.event.KeySym.ESCAPE:
+            self.state = GameState.PLAYER_TURN
+            return
+        if event.sym == tcod.event.KeySym.UP:
+            self.pause_menu_index = (self.pause_menu_index - 1) % len(items)
+            return
+        if event.sym == tcod.event.KeySym.DOWN:
+            self.pause_menu_index = (self.pause_menu_index + 1) % len(items)
+            return
+        if event.sym not in (tcod.event.KeySym.RETURN, tcod.event.KeySym.KP_ENTER):
+            return
+        if self.pause_menu_index == 0:
+            self.state = GameState.PLAYER_TURN
+        elif self.pause_menu_index == 1:
+            self.state = GameState.INGAME_MENU
+        elif self.pause_menu_index == 2:
+            self.options_return_state = GameState.PAUSE_MENU
+            self.state = GameState.OPTIONS_MENU
+        elif self.pause_menu_index == 3:
+            self.save_game(C.SAVE_PATH)
+            self.message_log.add("Game saved.", color.MSG_STATUS)
+        else:
+            raise SystemExit(0)
+
+    def _adjust_setting(self, key: str, delta: int) -> None:
+        if key == "display_mode":
+            self.settings[key] = "Fullscreen" if self.settings[key] == "Windowed" else "Windowed"
+        elif key == "brightness":
+            self.settings[key] = max(50, min(150, int(self.settings[key]) + delta * 10))
+        elif key in ("master_volume", "music_volume", "sfx_volume"):
+            self.settings[key] = max(0, min(100, int(self.settings[key]) + delta * 10))
+        elif key == "tileset_style":
+            self.settings[key] = "enhanced" if self.settings[key] == "ascii" else "ascii"
+            self.message_log.add(f"Tileset switched to {self.settings[key]}.", color.MSG_STATUS)
+        elif key == "control_scheme":
+            self.settings[key] = "Controller" if self.settings[key] == "Keyboard+Mouse" else "Keyboard+Mouse"
+
+    def _handle_options_menu_event(self, event: tcod.event.Event) -> None:
+        if not isinstance(event, tcod.event.KeyDown):
+            return
+        option_keys = [
+            "display_mode",
+            "brightness",
+            "master_volume",
+            "music_volume",
+            "sfx_volume",
+            "tileset_style",
+            "controls_menu",
+            "control_scheme",
+        ]
+        if event.sym == tcod.event.KeySym.ESCAPE:
+            self.state = self.options_return_state
+            return
+        if event.sym == tcod.event.KeySym.UP:
+            self.options_menu_index = (self.options_menu_index - 1) % len(option_keys)
+            return
+        if event.sym == tcod.event.KeySym.DOWN:
+            self.options_menu_index = (self.options_menu_index + 1) % len(option_keys)
+            return
+        selected_key = option_keys[self.options_menu_index]
+        if selected_key == "controls_menu" and event.sym in (tcod.event.KeySym.RETURN, tcod.event.KeySym.KP_ENTER):
+            self.state = GameState.CONTROLS_MENU
+            return
+        if event.sym in (tcod.event.KeySym.LEFT, tcod.event.KeySym.RIGHT):
+            if selected_key != "controls_menu":
+                delta = -1 if event.sym == tcod.event.KeySym.LEFT else 1
+                self._adjust_setting(selected_key, delta)
+
+    def _handle_controls_menu_event(self, event: tcod.event.Event) -> None:
+        if isinstance(event, tcod.event.KeyDown) and event.sym == tcod.event.KeySym.ESCAPE:
+            self.state = GameState.OPTIONS_MENU
+
+    def _handle_ingame_menu_event(self, event: tcod.event.Event) -> None:
+        if not isinstance(event, tcod.event.KeyDown):
+            return
+        if event.sym in (tcod.event.KeySym.ESCAPE, tcod.event.KeySym.TAB):
+            self.state = GameState.PLAYER_TURN
+            return
+        if event.sym == tcod.event.KeySym.UP:
+            self.ingame_menu_index = (self.ingame_menu_index - 1) % len(self.ingame_sections)
+        elif event.sym == tcod.event.KeySym.DOWN:
+            self.ingame_menu_index = (self.ingame_menu_index + 1) % len(self.ingame_sections)
+
+    # ------------------------------------------------------------------
     def _handle_player_key(self, event: tcod.event.KeyDown) -> None:
         pos = self.world.get(self.player, Position)
         sym = event.sym
 
         if sym == tcod.event.KeySym.ESCAPE:
-            raise SystemExit(0)
+            self.pause_menu_index = 0
+            self.state = GameState.PAUSE_MENU
+            return
+
+        if sym == tcod.event.KeySym.TAB:
+            self.state = GameState.INGAME_MENU
+            return
 
         if sym == tcod.event.KeySym.I:
             self.state = GameState.SHOW_INVENTORY
@@ -552,7 +770,7 @@ class Engine:
 
     def _show_help(self) -> None:
         self.message_log.add(
-            "move/attack  g=get  i=inv  d=drop  ></<=stairs  m=world map  s=save  ESC=quit",
+            "move/attack g=get i=inv d=drop tab=in-game menu m=world map s=save esc=pause",
             color.WHITE,
         )
 
@@ -860,10 +1078,21 @@ class Engine:
     @staticmethod
     def load_game(path: str) -> Engine:
         with open(path, "rb") as f:
-            return pickle.load(f)
+            engine = pickle.load(f)
+        engine._ensure_runtime_defaults()
+        engine.state = GameState.OPENING
+        return engine
 
     # ------------------------------------------------------------------
     def render(self, console: tcod.console.Console) -> None:
+        if self.state == GameState.OPENING:
+            render_opening_screen(console)
+            return
+
+        if self.state == GameState.HOME_MENU:
+            render_home_menu(console, self._home_menu_items(), self.home_menu_index)
+            return
+
         if self.state == GameState.WORLD_MAP:
             player_cell = (self.location.zx // C.ZONES_PER_CELL, self.location.zy // C.ZONES_PER_CELL)
             town_cells = {
@@ -873,7 +1102,16 @@ class Engine:
             render_world_map(console, player_cell, self.world_map_cursor, self.discovered_cells, town_cells)
             return
 
-        render_all(console, self.world, self.game_map, self.player, self.message_log, self.location, self.clock)
+        render_all(
+            console,
+            self.world,
+            self.game_map,
+            self.player,
+            self.message_log,
+            self.location,
+            self.clock,
+            tileset_style=self.settings["tileset_style"],
+        )
 
         if self.state == GameState.TALKING and self.talking_to is not None:
             dialog = self.world.get(self.talking_to, Dialog)
@@ -893,6 +1131,24 @@ class Engine:
             render_inventory(console, self.world, self.inventory_world, self.player, "Select an item to drop  (ESC to cancel)")
         elif self.state == GameState.LEVEL_UP:
             render_level_up(console, self.world, self.player)
+        elif self.state == GameState.PAUSE_MENU:
+            render_pause_menu(console, self._pause_menu_items(), self.pause_menu_index)
+        elif self.state == GameState.OPTIONS_MENU:
+            render_options_menu(console, self.settings, self.options_menu_index)
+        elif self.state == GameState.CONTROLS_MENU:
+            render_controls_menu(console, self.settings["control_scheme"])
+        elif self.state == GameState.INGAME_MENU:
+            render_ingame_menu(
+                console,
+                self.ingame_menu_index,
+                self.ingame_sections,
+                self.world,
+                self.inventory_world,
+                self.player,
+                self.location,
+                self.discovered_cells,
+                self.active_quests,
+            )
         elif self.state == GameState.PLAYER_DEAD:
             cx = C.SCREEN_WIDTH // 2
             cy = C.SCREEN_HEIGHT // 2

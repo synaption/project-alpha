@@ -24,13 +24,28 @@ pip install tcod numpy
 | `g` | Pick up item at your feet |
 | `i` | Open inventory (then press letter to use item) |
 | `d` | Drop item from inventory |
+| `Tab` | Open in-game menu (Inventory / Active Quests / Maps / Stats) |
 | `>` (Shift+`.`) | Descend dungeon stairs (must be standing on `>`) |
 | `<` (Shift+`,`) | Climb dungeon stairs up (must be standing on `<`) |
 | Walk into a screen edge | Cross to the neighbouring surface screen |
 | `m` | Open the world map (fast-travel) — surface only |
 | `s` | Save game |
 | `Shift+?` | Print key help to message log |
-| `Esc` | Quit |
+| `Esc` | Open pause menu |
+
+## Menus
+
+- **Opening screen**: press any key to continue to the home screen.
+- **Home menu**: begin/continue, open options, or quit.
+- **Pause menu** (`Esc` in-game): resume, open in-game menu, open options, save, or quit.
+- **Options menu**: change display mode, brightness, audio levels, tileset style, and control scheme.
+- **Controls menu**: reference bindings for keyboard/mouse and controller mapping.
+- **In-game menu** (`Tab`): view inventory, active quests, map info, and player stats.
+
+## Tileset styles
+
+- `ascii` (default): classic roguelike ASCII-style glyphs.
+- `enhanced`: unicode tile style with richer map/entity symbols.
 
 ## Starting in Thornveil
 

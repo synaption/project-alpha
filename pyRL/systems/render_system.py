@@ -23,23 +23,50 @@ def render_all(
     message_log: MessageLog,
     location: Location,
     clock: GameClock | None = None,
+    tileset_style: str = "ascii",
 ) -> None:
     console.clear()
-    # Dimming applies anywhere outdoors (the surface — wilderness or town zones);
-    # dungeons are always torch-lit.
     outdoors = location.kind == "surface"
     light = clock.light_level() if (clock is not None and outdoors) else 1.0
-    _render_map(console, game_map, light)
-    _render_entities(console, world, game_map, light)
+    _render_map(console, game_map, light, tileset_style)
+    _render_entities(console, world, game_map, light, tileset_style)
     _render_ui(console, world, player, message_log, location, clock)
 
 
-def _render_map(console, game_map: GameMap, light: float = 1.0) -> None:
+def _styled_char(ch: str, tileset_style: str) -> str:
+    if tileset_style != "enhanced":
+        return ch
+    replacements = {
+        ".": "·",
+        "#": "▓",
+        "^": "♣",
+        "A": "⌂",
+        "~": "≈",
+        "+": "╬",
+        ">": "▼",
+        "<": "▲",
+        "@": "☻",
+        "o": "⚉",
+        "T": "♜",
+        "c": "♞",
+        "%": "✝",
+    }
+    return replacements.get(ch, ch)
+
+
+def _render_map(console, game_map: GameMap, light: float = 1.0, tileset_style: str = "ascii") -> None:
     composite = np.select(
         condlist=[game_map.visible, game_map.explored],
         choicelist=[game_map.tiles["light"], game_map.tiles["dark"]],
         default=tile_types.SHROUD,
     )
+    if tileset_style == "enhanced":
+        composite = composite.copy()
+        for base in [".", "#", "^", "A", "~", "+", ">", "<"]:
+            styled = _styled_char(base, tileset_style)
+            if styled != base:
+                mask = composite["ch"] == ord(base)
+                composite["ch"][mask] = ord(styled)
     if light < 1.0:
         composite = composite.copy()
         dim_mask = game_map.visible
@@ -48,12 +75,14 @@ def _render_map(console, game_map: GameMap, light: float = 1.0) -> None:
     console.rgb[0:game_map.height, 0:game_map.width] = composite
 
 
-def _render_entities(console, world: World, game_map: GameMap, light: float = 1.0) -> None:
+def _render_entities(
+    console, world: World, game_map: GameMap, light: float = 1.0, tileset_style: str = "ascii"
+) -> None:
     for eid, (pos, rend) in sorted(
         world.query(Position, Renderable), key=lambda e: e[1][1].render_order
     ):
         if game_map.in_bounds(pos.x, pos.y) and game_map.visible[pos.y, pos.x]:
-            console.rgb["ch"][pos.y, pos.x] = ord(rend.char)
+            console.rgb["ch"][pos.y, pos.x] = ord(_styled_char(rend.char, tileset_style))
             fg = rend.fg if light >= 1.0 else tuple(int(c * light) for c in rend.fg)
             console.rgb["fg"][pos.y, pos.x] = fg
 
@@ -186,3 +215,153 @@ def render_level_up(console, world: World, player: int) -> None:
     console.print(x=x+1, y=y+4, string=f"(a) +20 Max HP   (current: {fighter.max_hp})", fg=color.WHITE)
     console.print(x=x+1, y=y+5, string=f"(b) +1 Attack    (current: {fighter.power})", fg=color.WHITE)
     console.print(x=x+1, y=y+6, string=f"(c) +1 Defense   (current: {fighter.defense})", fg=color.WHITE)
+
+
+def _menu_frame(console, title: str, width: int, height: int) -> tuple[int, int]:
+    x = (C.SCREEN_WIDTH - width) // 2
+    y = (C.SCREEN_HEIGHT - height) // 2
+    console.draw_frame(x=x, y=y, width=width, height=height, title=title, fg=color.WHITE, bg=color.BLACK)
+    return x, y
+
+
+def render_opening_screen(console) -> None:
+    console.clear()
+    logo = [
+        "██████╗ ██╗   ██╗██████╗ ██╗     ",
+        "██╔══██╗╚██╗ ██╔╝██╔══██╗██║     ",
+        "██████╔╝ ╚████╔╝ ██████╔╝██║     ",
+        "██╔═══╝   ╚██╔╝  ██╔══██╗██║     ",
+        "██║        ██║   ██║  ██║███████╗",
+        "╚═╝        ╚═╝   ╚═╝  ╚═╝╚══════╝",
+    ]
+    start_y = 10
+    for i, line in enumerate(logo):
+        x = max(0, (C.SCREEN_WIDTH - len(line)) // 2)
+        console.print(x=x, y=start_y + i, string=line, fg=color.MSG_LEVEL_UP)
+    title = "A True Roguelike Adventure"
+    tx = max(0, (C.SCREEN_WIDTH - len(title)) // 2)
+    console.print(x=tx, y=start_y + len(logo) + 2, string=title, fg=color.WHITE)
+    hint = "Press any key to continue"
+    hx = max(0, (C.SCREEN_WIDTH - len(hint)) // 2)
+    console.print(x=hx, y=start_y + len(logo) + 6, string=hint, fg=color.GRAY)
+
+
+def render_home_menu(console, items: list[str], selected: int) -> None:
+    console.clear()
+    x, y = _menu_frame(console, " pyRL ", 44, 14)
+    subtitle = "Home"
+    sx = x + (44 - len(subtitle)) // 2
+    console.print(x=sx, y=y + 2, string=subtitle, fg=color.WHITE)
+    for i, item in enumerate(items):
+        fg = color.BLACK if i == selected else color.WHITE
+        bg = color.WORLDMAP_CURSOR if i == selected else color.BLACK
+        console.print(x=x + 3, y=y + 4 + i, string=item.ljust(36), fg=fg, bg=bg)
+
+
+def render_pause_menu(console, items: list[str], selected: int) -> None:
+    x, y = _menu_frame(console, " Pause Menu ", 50, 16)
+    for i, item in enumerate(items):
+        fg = color.BLACK if i == selected else color.WHITE
+        bg = color.WORLDMAP_CURSOR if i == selected else color.BLACK
+        console.print(x=x + 3, y=y + 2 + i, string=item.ljust(42), fg=fg, bg=bg)
+    console.print(x=x + 3, y=y + 13, string="Use arrows + Enter. Esc resumes game.", fg=color.GRAY)
+
+
+def render_options_menu(console, settings: dict[str, object], selected: int) -> None:
+    x, y = _menu_frame(console, " Options ", 64, 19)
+    rows = [
+        f"Display Mode: {settings['display_mode']}",
+        f"Brightness: {settings['brightness']}%",
+        f"Master Volume: {settings['master_volume']}%",
+        f"Music Volume: {settings['music_volume']}%",
+        f"SFX Volume: {settings['sfx_volume']}%",
+        f"Tileset: {settings['tileset_style']}",
+        "Controls: open bindings menu",
+        f"Control Scheme: {settings['control_scheme']}",
+    ]
+    for i, row in enumerate(rows):
+        fg = color.BLACK if i == selected else color.WHITE
+        bg = color.WORLDMAP_CURSOR if i == selected else color.BLACK
+        console.print(x=x + 2, y=y + 2 + i, string=row.ljust(58), fg=fg, bg=bg)
+    console.print(x=x + 2, y=y + 14, string="Left/Right adjust. Enter opens Controls on that row.", fg=color.GRAY)
+    console.print(x=x + 2, y=y + 15, string="Esc returns to previous menu.", fg=color.GRAY)
+
+
+def render_controls_menu(console, control_scheme: str) -> None:
+    x, y = _menu_frame(console, " Controls ", 72, 20)
+    lines = [
+        f"Active scheme: {control_scheme}",
+        "",
+        "Keyboard + Mouse",
+        "  Move: Arrow keys / HJKL / Numpad",
+        "  Interact/Pickup: G",
+        "  Inventory: I",
+        "  Drop: D",
+        "  Pause: Esc",
+        "  In-game menu: Tab",
+        "",
+        "Controller (planned mapping)",
+        "  Left Stick / D-pad: Move",
+        "  A: Interact / Select",
+        "  B: Back / Pause",
+        "  X: Inventory",
+        "  Y: In-game menu",
+    ]
+    for i, line in enumerate(lines):
+        console.print(x=x + 2, y=y + 2 + i, string=line, fg=color.WHITE if line else color.GRAY)
+    console.print(x=x + 2, y=y + 18, string="Press Esc to return to Options.", fg=color.GRAY)
+
+
+def render_ingame_menu(
+    console,
+    section_index: int,
+    sections: list[str],
+    world: World,
+    inventory_world: World,
+    player: int,
+    location: Location,
+    discovered_cells: set[tuple[int, int]],
+    active_quests: list[str],
+) -> None:
+    x, y = _menu_frame(console, " In-Game Menu ", 72, 24)
+    tab_x = x + 2
+    for i, section in enumerate(sections):
+        fg = color.BLACK if i == section_index else color.WHITE
+        bg = color.WORLDMAP_CURSOR if i == section_index else color.BLACK
+        console.print(x=tab_x, y=y + 2 + i, string=section.ljust(15), fg=fg, bg=bg)
+    content_x = x + 20
+    content_y = y + 3
+    current = sections[section_index]
+    if current == "Inventory":
+        inv = world.get(player, Inventory)
+        items = inv.items if inv else []
+        if not items:
+            console.print(x=content_x, y=content_y, string="Inventory is empty.", fg=color.GRAY)
+        for i, item_id in enumerate(items[:14]):
+            name = inventory_world.get(item_id, Name)
+            console.print(x=content_x, y=content_y + i, string=f"- {name.name if name else 'Unknown Item'}", fg=color.WHITE)
+    elif current == "Active Quests":
+        if not active_quests:
+            console.print(x=content_x, y=content_y, string="No active quests.", fg=color.GRAY)
+        for i, quest in enumerate(active_quests[:14]):
+            console.print(x=content_x, y=content_y + i, string=f"- {quest}", fg=color.WHITE)
+    elif current == "Maps":
+        if location.kind == "surface":
+            place = location.site.title() if location.site else "Wilderness"
+            console.print(x=content_x, y=content_y, string=f"Current region: {place}", fg=color.WHITE)
+            console.print(x=content_x, y=content_y + 1, string=f"Zone: ({location.zx}, {location.zy})", fg=color.WHITE)
+        else:
+            console.print(x=content_x, y=content_y, string=f"Current dungeon: {location.site.title()}", fg=color.WHITE)
+            console.print(x=content_x, y=content_y + 1, string=f"Depth: {location.depth}", fg=color.WHITE)
+        console.print(x=content_x, y=content_y + 3, string=f"Discovered world cells: {len(discovered_cells)}", fg=color.WHITE)
+    else:
+        fighter = world.get(player, Fighter)
+        lvl = world.get(player, Level)
+        if fighter:
+            console.print(x=content_x, y=content_y, string=f"HP: {fighter.hp}/{fighter.max_hp}", fg=color.WHITE)
+            console.print(x=content_x, y=content_y + 1, string=f"Attack: {fighter.power}", fg=color.WHITE)
+            console.print(x=content_x, y=content_y + 2, string=f"Defense: {fighter.defense}", fg=color.WHITE)
+        if lvl:
+            console.print(x=content_x, y=content_y + 4, string=f"Level: {lvl.current_level}", fg=color.WHITE)
+            console.print(x=content_x, y=content_y + 5, string=f"XP: {lvl.current_xp}/{lvl.xp_to_next}", fg=color.WHITE)
+    console.print(x=x + 20, y=y + 21, string="Up/Down switch sections. Esc/Tab closes.", fg=color.GRAY)
