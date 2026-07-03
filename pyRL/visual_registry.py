@@ -11,6 +11,15 @@ DEFAULT_TILE_SCALE_MIN = 75
 DEFAULT_TILE_SCALE_MAX = 200
 
 
+@lru_cache(maxsize=512)
+def _glyph_supported(glyph: str) -> bool:
+    try:
+        glyph.encode("cp437")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 @lru_cache(maxsize=1)
 def _load_registry() -> dict:
     try:
@@ -66,13 +75,6 @@ def resolve_tile_glyph(
     active_tileset: str,
     fallback_preset: str,
 ) -> str:
-    def _glyph_supported(glyph: str) -> bool:
-        try:
-            glyph.encode("cp437")
-            return True
-        except UnicodeEncodeError:
-            return False
-
     if not tile_id:
         return ascii_char
     registry = _load_registry()
