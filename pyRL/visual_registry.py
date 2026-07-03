@@ -11,7 +11,6 @@ DEFAULT_TILE_SCALE_MIN = 75
 DEFAULT_TILE_SCALE_MAX = 200
 
 
-@lru_cache(maxsize=512)
 def _glyph_supported(glyph: str) -> bool:
     return isinstance(glyph, str) and len(glyph) == 1
 
