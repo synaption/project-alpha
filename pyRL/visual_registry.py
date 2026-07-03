@@ -10,8 +10,18 @@ DEFAULT_TEXT_SCALE_MAX = 225
 DEFAULT_TILE_SCALE_MIN = 75
 DEFAULT_TILE_SCALE_MAX = 200
 
+# python's cp437 codec keeps byte 0x00-0x1F as control chars, but tcod's
+# CHARMAP_CP437 uses the visible IBM-PC glyphs in those slots.
+_CP437_VISIBLE_CONTROLS = {
+    "☺", "☻", "♥", "♦", "♣", "♠", "•", "◘", "○", "◙",
+    "♂", "♀", "♪", "♫", "☼", "►", "◄", "↕", "‼", "¶",
+    "§", "▬", "↨", "↑", "↓", "→", "←", "∟", "↔", "▲", "▼",
+}
+
 
 def _glyph_supported(glyph: str) -> bool:
+    if glyph in _CP437_VISIBLE_CONTROLS:
+        return True
     try:
         glyph.encode("cp437")
         return True
