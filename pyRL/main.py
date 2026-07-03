@@ -35,7 +35,11 @@ def _load_hexany_tileset_from_zip():
         with NamedTemporaryFile("wb", dir=extracted.parent, delete=False) as tmp_file:
             tmp_file.write(tile_data)
             temp_path = Path(tmp_file.name)
-        os.replace(temp_path, extracted)
+        try:
+            os.replace(temp_path, extracted)
+        except OSError:
+            temp_path.unlink(missing_ok=True)
+            raise
     return tcod.tileset.load_tilesheet(str(extracted), 32, 8, tcod.tileset.CHARMAP_CP437)
 
 
