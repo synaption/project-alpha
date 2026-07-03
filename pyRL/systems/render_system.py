@@ -114,7 +114,9 @@ def _render_map(
         composite["bg"][dim_mask] = (composite["bg"][dim_mask] * light).astype(np.uint8)
     palette_registry.transform_rgb_array(composite["fg"])
     palette_registry.transform_rgb_array(composite["bg"])
-    console.rgb[0:game_map.height, 0:game_map.width] = composite
+    region = console.rgb[0:h, 0:w]
+    for field in ("ch", "fg", "bg"):
+        region[field] = composite[field]
 
 
 def _render_entities(
