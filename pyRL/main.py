@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from tempfile import gettempdir
+from tempfile import NamedTemporaryFile, gettempdir
 import zipfile
 import tcod
 import tcod.event
@@ -28,8 +28,12 @@ def _load_hexany_tileset_from_zip():
     extracted.parent.mkdir(parents=True, exist_ok=True)
     if not extracted.exists():
         with zipfile.ZipFile(zip_path) as archive:
-            with archive.open(_HEXANY_TILESET_MEMBER) as src, extracted.open("wb") as dst:
-                dst.write(src.read())
+            with archive.open(_HEXANY_TILESET_MEMBER) as src:
+                tile_data = src.read()
+        with NamedTemporaryFile("wb", dir=extracted.parent, delete=False) as tmp_file:
+            tmp_file.write(tile_data)
+            temp_path = Path(tmp_file.name)
+        os.replace(temp_path, extracted)
     return tcod.tileset.load_tilesheet(str(extracted), 32, 8, tcod.tileset.CHARMAP_CP437)
 
 
