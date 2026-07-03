@@ -30,12 +30,15 @@ def main() -> None:
     else:
         engine = Engine()
     active_tileset = str(engine.settings.get("active_tileset", "ascii"))
-    try:
-        if active_tileset == "hexany_visual":
+    if active_tileset == "hexany_visual":
+        try:
             tileset = _load_hexany_tileset_from_zip()
-        else:
-            raise RuntimeError("Use fallback font path.")
-    except Exception:
+        except (FileNotFoundError, KeyError, OSError, zipfile.BadZipFile):
+            text_min, text_max, _, _ = visual_registry.scale_bounds(active_tileset)
+            text_scale = max(text_min, min(text_max, int(engine.settings.get("text_scale", 100))))
+            tile_px = max(8, int(C.TILE_SIZE * text_scale / 100))
+            tileset = tcod.tileset.load_truetype_font(C.FONT_PATH, tile_px, tile_px)
+    else:
         text_min, text_max, _, _ = visual_registry.scale_bounds(active_tileset)
         text_scale = max(text_min, min(text_max, int(engine.settings.get("text_scale", 100))))
         tile_px = max(8, int(C.TILE_SIZE * text_scale / 100))
