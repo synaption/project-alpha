@@ -12,7 +12,11 @@ DEFAULT_TILE_SCALE_MAX = 200
 
 
 def _glyph_supported(glyph: str) -> bool:
-    return isinstance(glyph, str) and len(glyph) == 1
+    try:
+        glyph.encode("cp437")
+        return True
+    except UnicodeEncodeError:
+        return False
 
 
 @lru_cache(maxsize=1)
