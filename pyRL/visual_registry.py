@@ -66,14 +66,22 @@ def resolve_tile_glyph(
     active_tileset: str,
     fallback_preset: str,
 ) -> str:
+    def _glyph_supported(glyph: str) -> bool:
+        try:
+            glyph.encode("cp437")
+            return True
+        except UnicodeEncodeError:
+            return False
+
     if not tile_id:
         return ascii_char
     registry = _load_registry()
     tilesets = registry["tilesets"]
     for tileset_name in resolve_tileset_chain(active_tileset, fallback_preset):
         mapping = tilesets.get(tileset_name, {}).get("tile_map", {}).get(tile_id)
-        if mapping and mapping.get("glyph"):
-            return mapping["glyph"]
+        glyph = mapping.get("glyph") if mapping else None
+        if glyph and _glyph_supported(glyph):
+            return glyph
     return ascii_char
 
 
