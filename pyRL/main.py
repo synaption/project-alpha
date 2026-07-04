@@ -1,5 +1,4 @@
 import os
-import tempfile
 import zipfile
 from pathlib import Path
 import tcod
@@ -14,6 +13,7 @@ import visual_registry
 _PYRL_DIR = Path(__file__).resolve().parent
 _HEXANY_ZIP_PATH = _PYRL_DIR / "data" / "tilesets" / "hexanys_roguelike_tiles_0.3.0.zip"
 _HEXANY_DIRNAME = "hexanys_roguelike_tiles_0.3.0"
+_HEXANY_CACHE_ROOT = Path.home() / ".cache" / "pyrl" / "hexany-tiles"
 _HEXANY_SHEETS = {
     "general": ("Tilesheets/Transparent/general_transparent.png", 32, 8),
     "items": ("Tilesheets/Transparent/items_transparent.png", 24, 8),
@@ -44,7 +44,6 @@ _HEXANY_GLYPH_OVERRIDES = {
     "❞": ("general", 1, 7),     # crop growing
     "✿": ("general", 1, 3),     # crop ripe
 }
-_HEXANY_EXTRACT_ROOT: Path | None = None
 
 
 def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
@@ -55,23 +54,18 @@ def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
 
 
 def _resolve_hexany_asset_root() -> Path | None:
-    global _HEXANY_EXTRACT_ROOT
     extracted_root = _HEXANY_ZIP_PATH.parent / _HEXANY_DIRNAME
     if (extracted_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
         return extracted_root
     if not _HEXANY_ZIP_PATH.exists():
         return None
-    if _HEXANY_EXTRACT_ROOT is not None and (
-        _HEXANY_EXTRACT_ROOT / "Tilesheets" / "Transparent" / "general_transparent.png"
-    ).exists():
-        return _HEXANY_EXTRACT_ROOT
-
-    temp_root = Path(tempfile.mkdtemp(prefix="pyrl-hexany-tiles-"))
-    with zipfile.ZipFile(_HEXANY_ZIP_PATH) as archive:
-        archive.extractall(temp_root)
-    target_root = temp_root / _HEXANY_DIRNAME
+    target_root = _HEXANY_CACHE_ROOT / _HEXANY_DIRNAME
     if (target_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
-        _HEXANY_EXTRACT_ROOT = target_root
+        return target_root
+    _HEXANY_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(_HEXANY_ZIP_PATH) as archive:
+        archive.extractall(_HEXANY_CACHE_ROOT)
+    if (target_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
         return target_root
     return None
 
