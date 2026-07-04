@@ -10,6 +10,9 @@ DEFAULT_TEXT_SCALE_MAX = 225
 DEFAULT_TILE_SCALE_MIN = 75
 DEFAULT_TILE_SCALE_MAX = 200
 
+def _glyph_supported(glyph: str) -> bool:
+    return bool(glyph)
+
 
 @lru_cache(maxsize=1)
 def _load_registry() -> dict:
@@ -72,8 +75,9 @@ def resolve_tile_glyph(
     tilesets = registry["tilesets"]
     for tileset_name in resolve_tileset_chain(active_tileset, fallback_preset):
         mapping = tilesets.get(tileset_name, {}).get("tile_map", {}).get(tile_id)
-        if mapping and mapping.get("glyph"):
-            return mapping["glyph"]
+        glyph = mapping.get("glyph") if mapping else None
+        if glyph and _glyph_supported(glyph):
+            return glyph
     return ascii_char
 
 

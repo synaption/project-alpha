@@ -1,5 +1,5 @@
 {
-  "default_tileset": "ascii",
+  "default_tileset": "hexany_visual",
   "aliases": {
     "enhanced": "enhanced_legacy"
   },
@@ -86,7 +86,7 @@
         "tile_scale_max": 200
       },
       "default_palette": "dawnbringer16",
-      "fallback_order": ["enhanced_legacy", "ascii"],
+      "fallback_order": ["ascii"],
       "tile_map": {
         "map.floor": {"tile_name": "floor_smooth", "glyph": "•"},
         "map.wall": {"tile_name": "wall_solid", "glyph": "█"},

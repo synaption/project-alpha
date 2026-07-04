@@ -46,7 +46,7 @@ pip install tcod numpy
 
 - Tilesets are data-driven from `pyRL/data/tilesets/tilesets.json`.
 - Rendering resolves each game tile ID by priority: selected tileset first, then fallback chain preset, then final `ascii` fallback.
-- `hexany_visual` is the preferred non-ASCII profile (Hexany-inspired), while `enhanced_legacy` remains available for compatibility.
+- `hexany_visual` is the preferred non-ASCII profile and now overlays real Hexany bitmap sprites from `data/tilesets/hexanys_roguelike_tiles_0.3.0.zip` (or an extracted copy) onto its glyph codepoints at startup; `enhanced_legacy` remains available for compatibility.
 - Text scale controls the font pixel size (applies on restart) to keep high desktop readability.
 - Tile scale controls glyph presentation density for visual tiles.
 - Palette packs are loaded from `pyRL/data/palettes/palettes.json` and can be swapped at runtime.

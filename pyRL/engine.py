@@ -57,7 +57,7 @@ DEFAULT_SETTINGS = {
     "master_volume": 80,
     "music_volume": 70,
     "sfx_volume": 75,
-    "active_tileset": "ascii",
+    "active_tileset": "hexany_visual",
     "tileset_fallback_preset": "registry_default",
     "text_scale": 100,
     "tile_scale": 100,
@@ -262,7 +262,7 @@ class Engine:
             str(self.settings["active_tileset"])
         )
         if self.settings["active_tileset"] not in visual_registry.tileset_names():
-            self.settings["active_tileset"] = "ascii"
+            self.settings["active_tileset"] = "hexany_visual"
         if self.settings["tileset_fallback_preset"] not in visual_registry.fallback_preset_names():
             self.settings["tileset_fallback_preset"] = "registry_default"
         text_min, text_max, tile_min, tile_max = visual_registry.scale_bounds(
