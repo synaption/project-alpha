@@ -44,6 +44,7 @@ _HEXANY_GLYPH_OVERRIDES = {
     "❞": ("general", 1, 7),     # crop growing
     "✿": ("general", 1, 3),     # crop ripe
 }
+_HEXANY_EXTRACT_ROOT: Path | None = None
 
 
 def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
@@ -54,21 +55,23 @@ def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
 
 
 def _resolve_hexany_asset_root() -> Path | None:
+    global _HEXANY_EXTRACT_ROOT
     extracted_root = _HEXANY_ZIP_PATH.parent / _HEXANY_DIRNAME
     if (extracted_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
         return extracted_root
     if not _HEXANY_ZIP_PATH.exists():
         return None
+    if _HEXANY_EXTRACT_ROOT is not None and (
+        _HEXANY_EXTRACT_ROOT / "Tilesheets" / "Transparent" / "general_transparent.png"
+    ).exists():
+        return _HEXANY_EXTRACT_ROOT
 
-    temp_root = Path(tempfile.gettempdir()) / "pyrl-hexany-tiles"
-    target_root = temp_root / _HEXANY_DIRNAME
-    if (target_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
-        return target_root
-
-    temp_root.mkdir(parents=True, exist_ok=True)
+    temp_root = Path(tempfile.mkdtemp(prefix="pyrl-hexany-tiles-"))
     with zipfile.ZipFile(_HEXANY_ZIP_PATH) as archive:
         archive.extractall(temp_root)
+    target_root = temp_root / _HEXANY_DIRNAME
     if (target_root / "Tilesheets" / "Transparent" / "general_transparent.png").exists():
+        _HEXANY_EXTRACT_ROOT = target_root
         return target_root
     return None
 
@@ -103,7 +106,7 @@ def _load_tileset(active_tileset: str, text_scale_setting: int) -> tcod.tileset.
         return tileset
     try:
         _apply_hexany_bitmap_overrides(tileset, assets_root)
-    except Exception:
+    except (FileNotFoundError, OSError, RuntimeError, ValueError):
         return tileset
     return tileset
 
