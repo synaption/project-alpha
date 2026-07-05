@@ -51,6 +51,8 @@ DEPTH_WINDOW_RADIUS = 1   # dungeon depths within this many levels of the curren
 # (see town_gen_procedural.py) but persist and get their own dungeons exactly
 # like Thornveil does, once visited.
 OTHER_TOWN_SITES = ["greywater", "oakhollow", "saltmarsh"]
+MIN_RENDER_SCALE = 1
+MAX_RENDER_SCALE = 4
 DEFAULT_SETTINGS = {
     "display_mode": "Windowed",
     "render_scale": 2,
@@ -262,7 +264,7 @@ class Engine:
         self.settings["active_tileset"] = visual_registry.normalize_tileset_name(
             str(self.settings["active_tileset"])
         )
-        self.settings["render_scale"] = max(1, min(4, int(self.settings["render_scale"])))
+        self.settings["render_scale"] = max(MIN_RENDER_SCALE, min(MAX_RENDER_SCALE, int(self.settings["render_scale"])))
         if self.settings["active_tileset"] not in visual_registry.tileset_names():
             self.settings["active_tileset"] = "hexany_visual"
         if self.settings["tileset_fallback_preset"] not in visual_registry.fallback_preset_names():
@@ -533,7 +535,7 @@ class Engine:
         if key == "display_mode":
             self.settings[key] = "Fullscreen" if self.settings[key] == "Windowed" else "Windowed"
         elif key == "render_scale":
-            self.settings[key] = max(1, min(4, int(self.settings[key]) + delta))
+            self.settings[key] = max(MIN_RENDER_SCALE, min(MAX_RENDER_SCALE, int(self.settings[key]) + delta))
             self.message_log.add("Render scale applies after restart.", color.MSG_STATUS)
         elif key == "brightness":
             self.settings[key] = max(50, min(150, int(self.settings[key]) + delta * 10))
