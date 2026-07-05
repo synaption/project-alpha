@@ -22,6 +22,10 @@ if TYPE_CHECKING:
     from world import World
 
 
+_DECOR_GRASS_COUNT_RANGE = (4, 8)
+_DECOR_GRASS_RADIUS_RANGE = (1, 2)
+
+
 def _blob(game_map: GameMap, rng: random.Random, tile, count_range, radius_range) -> None:
     for _ in range(rng.randint(*count_range)):
         cx = rng.randint(1, game_map.width - 2)
@@ -38,7 +42,7 @@ def generate_surface_zone(world: World, zx: int, zy: int, rng: random.Random) ->
     game_map.tiles[:, :] = tile_types.FLOOR
 
     # Keep decorative grass sparse so the default floor dot remains dominant.
-    _blob(game_map, rng, tile_types.GRASS, (4, 8), (1, 2))
+    _blob(game_map, rng, tile_types.GRASS, _DECOR_GRASS_COUNT_RANGE, _DECOR_GRASS_RADIUS_RANGE)
 
     # Scatter terrain: forest patches (walkable), plus occasional impassable
     # water and mountains for variety and to make the map read as wilderness.
