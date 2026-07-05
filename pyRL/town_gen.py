@@ -64,6 +64,7 @@ def generate_town(world: World, map_width: int, map_height: int) -> GameMap:
 
     # ── base layer ────────────────────────────────────────────────────────
     game_map.tiles[:, :] = tile_types.FLOOR
+    # Coordinate grids used to apply a deterministic sparse grass mask.
     yy, xx = np.indices((map_height, map_width))
     grass_mask = ((xx * _GRASS_PATTERN_X_MUL + yy * _GRASS_PATTERN_Y_MUL) % _GRASS_PATTERN_MOD) == 0
     game_map.tiles[grass_mask] = tile_types.GRASS

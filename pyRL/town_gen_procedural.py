@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 
 MAP_MARGIN = 4
 _EXTRA_ARCHETYPES = ["merchant", "child", "farmer", "elder"]
-_DECOR_GRASS_CHANCE = 0.04
+_GRASS_PATTERN_X_MUL = 19
+_GRASS_PATTERN_Y_MUL = 23
+_GRASS_PATTERN_MOD = 41
 
 # (kind, width, height)
 _GUARANTEED_BUILDINGS = [
@@ -69,12 +71,10 @@ def _door_position(rect: tuple[int, int, int, int], square_center: tuple[int, in
 def generate_town(world: World, site: str, map_width: int, map_height: int, rng: random.Random) -> GameMap:
     game_map = GameMap(world, map_width, map_height)
     game_map.tiles[:, :] = tile_types.FLOOR
-    grass_rolls = np.fromiter(
-        (rng.random() for _ in range(map_width * map_height)),
-        dtype=float,
-        count=map_width * map_height,
-    ).reshape((map_height, map_width))
-    game_map.tiles[grass_rolls < _DECOR_GRASS_CHANCE] = tile_types.GRASS
+    yy, xx = np.indices((map_height, map_width))
+    site_offset = sum((i + 1) * ord(ch) for i, ch in enumerate(site))
+    grass_mask = ((xx * _GRASS_PATTERN_X_MUL + yy * _GRASS_PATTERN_Y_MUL + site_offset) % _GRASS_PATTERN_MOD) == 0
+    game_map.tiles[grass_mask] = tile_types.GRASS
 
     cx, cy = map_width // 2, map_height // 2
     square = (cx - 8, cy - 6, 16, 12)
