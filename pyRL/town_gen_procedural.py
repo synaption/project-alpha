@@ -12,6 +12,7 @@ count/placement and the rest of the villager roster randomized on top.
 """
 from __future__ import annotations
 import random
+import numpy as np
 from typing import TYPE_CHECKING
 import tiles as tile_types
 from game_map import GameMap
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 MAP_MARGIN = 4
 _EXTRA_ARCHETYPES = ["merchant", "child", "farmer", "elder"]
+_DECOR_GRASS_CHANCE = 0.04
 
 # (kind, width, height)
 _GUARANTEED_BUILDINGS = [
@@ -67,10 +69,12 @@ def _door_position(rect: tuple[int, int, int, int], square_center: tuple[int, in
 def generate_town(world: World, site: str, map_width: int, map_height: int, rng: random.Random) -> GameMap:
     game_map = GameMap(world, map_width, map_height)
     game_map.tiles[:, :] = tile_types.FLOOR
-    for y in range(map_height):
-        for x in range(map_width):
-            if rng.random() < 0.04:
-                game_map.tiles[y, x] = tile_types.GRASS
+    grass_rolls = np.fromiter(
+        (rng.random() for _ in range(map_width * map_height)),
+        dtype=float,
+        count=map_width * map_height,
+    ).reshape((map_height, map_width))
+    game_map.tiles[grass_rolls < _DECOR_GRASS_CHANCE] = tile_types.GRASS
 
     cx, cy = map_width // 2, map_height // 2
     square = (cx - 8, cy - 6, 16, 12)

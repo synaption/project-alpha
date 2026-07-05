@@ -47,6 +47,11 @@ _FARM_PLOTS = [(x, y) for y in (37, 38) for x in (5, 6, 7)]
 # Where off-duty villagers gather to socialize.
 _SOCIAL_SPOT = (39, 24)
 
+# Deterministic sparse decorative-grass pattern over the base floor layer.
+_GRASS_PATTERN_X_MUL = 17
+_GRASS_PATTERN_Y_MUL = 31
+_GRASS_PATTERN_MOD = 53
+
 
 def _carve_building(tiles, x: int, y: int, w: int, h: int) -> None:
     """Fill perimeter with WALL, interior with INDOOR_FLOOR."""
@@ -60,7 +65,7 @@ def generate_town(world: World, map_width: int, map_height: int) -> GameMap:
     # ── base layer ────────────────────────────────────────────────────────
     game_map.tiles[:, :] = tile_types.FLOOR
     yy, xx = np.indices((map_height, map_width))
-    grass_mask = ((xx * 17 + yy * 31) % 53) == 0
+    grass_mask = ((xx * _GRASS_PATTERN_X_MUL + yy * _GRASS_PATTERN_Y_MUL) % _GRASS_PATTERN_MOD) == 0
     game_map.tiles[grass_mask] = tile_types.GRASS
 
     # ── town square (cobblestone) ─────────────────────────────────────────
