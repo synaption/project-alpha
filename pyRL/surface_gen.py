@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from world import World
 
 
+# Decorative grass tuning: number of blobs and each blob's radius range.
 _DECOR_GRASS_COUNT_RANGE = (4, 8)
 _DECOR_GRASS_RADIUS_RANGE = (1, 2)
 
