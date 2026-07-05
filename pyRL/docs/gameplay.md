@@ -38,7 +38,7 @@ pip install tcod numpy
 - **Opening screen**: press any key to continue to the home screen.
 - **Home menu**: begin/continue, open options, or quit.
 - **Pause menu** (`Esc` in-game): resume, open in-game menu, open options, save, or quit.
-- **Options menu**: change display mode, brightness, audio levels, active tileset, tileset fallback chain preset, text/tile scale, palette pack, and control scheme.
+- **Options menu**: change display mode, render scale, brightness, audio levels, active tileset, tileset fallback chain preset, text/tile scale, palette pack, and control scheme.
 - **Controls menu**: reference bindings for keyboard/mouse and controller mapping.
 - **In-game menu** (`Tab`): view inventory, active quests, map info, and player stats.
 
@@ -48,6 +48,7 @@ pip install tcod numpy
 - Rendering resolves each game tile ID by priority: selected tileset first, then fallback chain preset, then final `ascii` fallback.
 - `hexany_visual` is the preferred non-ASCII profile and now overlays real Hexany bitmap sprites from `data/tilesets/hexanys_roguelike_tiles_0.3.0.zip` (or an extracted copy) onto its glyph codepoints at startup; `enhanced_legacy` remains available for compatibility.
 - Text scale controls the font pixel size (applies on restart) to keep high desktop readability.
+- Render scale controls the final rendering area as an integer multiple, so tiles map to pixels at clean whole-number scaling (applies on restart).
 - Tile scale controls glyph presentation density for visual tiles.
 - Palette packs are loaded from `pyRL/data/palettes/palettes.json` and can be swapped at runtime.
 

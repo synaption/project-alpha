@@ -329,6 +329,7 @@ def render_options_menu(console, settings: dict[str, object], selected: int) -> 
     x, y = _menu_frame(console, " Options ", 72, 22)
     rows = [
         f"Display Mode: {settings['display_mode']}",
+        f"Render Scale: {settings['render_scale']}x",
         f"Brightness: {settings['brightness']}%",
         f"Master Volume: {settings['master_volume']}%",
         f"Music Volume: {settings['music_volume']}%",

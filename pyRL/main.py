@@ -46,10 +46,14 @@ _HEXANY_GLYPH_OVERRIDES = {
 }
 
 
-def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
+def _resolve_tile_px(active_tileset: str, text_scale_setting: int) -> int:
     text_min, text_max, _, _ = visual_registry.scale_bounds(active_tileset)
     text_scale = max(text_min, min(text_max, int(text_scale_setting)))
-    tile_px = max(8, int(C.TILE_SIZE * text_scale / 100))
+    return max(8, int(C.TILE_SIZE * text_scale / 100))
+
+
+def _load_truetype_tileset(active_tileset: str, text_scale_setting: int):
+    tile_px = _resolve_tile_px(active_tileset, text_scale_setting)
     return tcod.tileset.load_truetype_font(C.FONT_PATH, tile_px, tile_px)
 
 
@@ -111,12 +115,17 @@ def main() -> None:
     else:
         engine = Engine()
     active_tileset = str(engine.settings.get("active_tileset", "ascii"))
-    tileset = _load_tileset(active_tileset, engine.settings.get("text_scale", 100))
+    text_scale = int(engine.settings.get("text_scale", 100))
+    tile_px = _resolve_tile_px(active_tileset, text_scale)
+    render_scale = max(1, int(engine.settings.get("render_scale", 2)))
+    tileset = _load_tileset(active_tileset, text_scale)
 
     with tcod.context.new(
         columns=C.SCREEN_WIDTH,
         rows=C.SCREEN_HEIGHT,
         tileset=tileset,
+        width=C.SCREEN_WIDTH * tile_px * render_scale,
+        height=C.SCREEN_HEIGHT * tile_px * render_scale,
         title="pyRL  —  a true roguelike",
         vsync=True,
     ) as context:
@@ -125,7 +134,7 @@ def main() -> None:
             events = list(tcod.event.get())
             engine.handle_events(events)
             engine.render(console)
-            context.present(console)
+            context.present(console, keep_aspect=True, integer_scaling=True)
 
 
 if __name__ == "__main__":

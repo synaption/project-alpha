@@ -53,6 +53,7 @@ DEPTH_WINDOW_RADIUS = 1   # dungeon depths within this many levels of the curren
 OTHER_TOWN_SITES = ["greywater", "oakhollow", "saltmarsh"]
 DEFAULT_SETTINGS = {
     "display_mode": "Windowed",
+    "render_scale": 2,
     "brightness": 100,
     "master_volume": 80,
     "music_volume": 70,
@@ -261,6 +262,7 @@ class Engine:
         self.settings["active_tileset"] = visual_registry.normalize_tileset_name(
             str(self.settings["active_tileset"])
         )
+        self.settings["render_scale"] = max(1, min(4, int(self.settings["render_scale"])))
         if self.settings["active_tileset"] not in visual_registry.tileset_names():
             self.settings["active_tileset"] = "hexany_visual"
         if self.settings["tileset_fallback_preset"] not in visual_registry.fallback_preset_names():
@@ -530,6 +532,9 @@ class Engine:
     def _adjust_setting(self, key: str, delta: int) -> None:
         if key == "display_mode":
             self.settings[key] = "Fullscreen" if self.settings[key] == "Windowed" else "Windowed"
+        elif key == "render_scale":
+            self.settings[key] = max(1, min(4, int(self.settings[key]) + delta))
+            self.message_log.add("Render scale applies after restart.", color.MSG_STATUS)
         elif key == "brightness":
             self.settings[key] = max(50, min(150, int(self.settings[key]) + delta * 10))
         elif key in ("master_volume", "music_volume", "sfx_volume"):
@@ -567,6 +572,7 @@ class Engine:
             return
         option_keys = [
             "display_mode",
+            "render_scale",
             "brightness",
             "master_volume",
             "music_volume",
