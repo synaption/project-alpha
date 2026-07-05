@@ -58,7 +58,10 @@ def generate_town(world: World, map_width: int, map_height: int) -> GameMap:
     game_map = GameMap(world, map_width, map_height)
 
     # ── base layer ────────────────────────────────────────────────────────
-    game_map.tiles[:, :] = tile_types.GRASS
+    game_map.tiles[:, :] = tile_types.FLOOR
+    yy, xx = np.indices((map_height, map_width))
+    grass_mask = ((xx * 17 + yy * 31) % 53) == 0
+    game_map.tiles[grass_mask] = tile_types.GRASS
 
     # ── town square (cobblestone) ─────────────────────────────────────────
     game_map.tiles[15:27, 33:47] = tile_types.COBBLESTONE

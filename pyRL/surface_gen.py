@@ -35,7 +35,10 @@ def _blob(game_map: GameMap, rng: random.Random, tile, count_range, radius_range
 
 def generate_surface_zone(world: World, zx: int, zy: int, rng: random.Random) -> GameMap:
     game_map = GameMap(world, C.MAP_WIDTH, C.MAP_HEIGHT)
-    game_map.tiles[:, :] = tile_types.GRASS
+    game_map.tiles[:, :] = tile_types.FLOOR
+
+    # Keep decorative grass sparse so the default floor dot remains dominant.
+    _blob(game_map, rng, tile_types.GRASS, (2, 5), (1, 2))
 
     # Scatter terrain: forest patches (walkable), plus occasional impassable
     # water and mountains for variety and to make the map read as wilderness.
@@ -43,12 +46,12 @@ def generate_surface_zone(world: World, zx: int, zy: int, rng: random.Random) ->
     _blob(game_map, rng, tile_types.WATER, (0, 2), (1, 3))
     _blob(game_map, rng, tile_types.MOUNTAIN, (0, 2), (1, 3))
 
-    # Walkable-border invariant: the outer ring is always plain grass, so an
+    # Walkable-border invariant: the outer ring is always plain floor, so an
     # entity arriving on any edge lands on a walkable tile and zones connect.
-    game_map.tiles[0, :] = tile_types.GRASS
-    game_map.tiles[game_map.height - 1, :] = tile_types.GRASS
-    game_map.tiles[:, 0] = tile_types.GRASS
-    game_map.tiles[:, game_map.width - 1] = tile_types.GRASS
+    game_map.tiles[0, :] = tile_types.FLOOR
+    game_map.tiles[game_map.height - 1, :] = tile_types.FLOOR
+    game_map.tiles[:, 0] = tile_types.FLOOR
+    game_map.tiles[:, game_map.width - 1] = tile_types.FLOOR
 
     game_map.player_start = (game_map.width // 2, game_map.height // 2)
     return game_map

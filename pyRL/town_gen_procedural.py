@@ -66,7 +66,11 @@ def _door_position(rect: tuple[int, int, int, int], square_center: tuple[int, in
 
 def generate_town(world: World, site: str, map_width: int, map_height: int, rng: random.Random) -> GameMap:
     game_map = GameMap(world, map_width, map_height)
-    game_map.tiles[:, :] = tile_types.GRASS
+    game_map.tiles[:, :] = tile_types.FLOOR
+    for y in range(map_height):
+        for x in range(map_width):
+            if rng.random() < 0.04:
+                game_map.tiles[y, x] = tile_types.GRASS
 
     cx, cy = map_width // 2, map_height // 2
     square = (cx - 8, cy - 6, 16, 12)
