@@ -117,7 +117,7 @@ def main() -> None:
     active_tileset = str(engine.settings.get("active_tileset", "ascii"))
     text_scale = int(engine.settings.get("text_scale", 100))
     tile_px = _resolve_tile_px(active_tileset, text_scale)
-    render_scale = max(1, int(engine.settings.get("render_scale", 2)))
+    render_scale = int(engine.settings.get("render_scale", 2))
     tileset = _load_tileset(active_tileset, text_scale)
 
     with tcod.context.new(
