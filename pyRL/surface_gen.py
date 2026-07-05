@@ -38,7 +38,7 @@ def generate_surface_zone(world: World, zx: int, zy: int, rng: random.Random) ->
     game_map.tiles[:, :] = tile_types.FLOOR
 
     # Keep decorative grass sparse so the default floor dot remains dominant.
-    _blob(game_map, rng, tile_types.GRASS, (2, 5), (1, 2))
+    _blob(game_map, rng, tile_types.GRASS, (3, 6), (1, 2))
 
     # Scatter terrain: forest patches (walkable), plus occasional impassable
     # water and mountains for variety and to make the map read as wilderness.
