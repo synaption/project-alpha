@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 
 MAP_MARGIN = 4
 _EXTRA_ARCHETYPES = ["merchant", "child", "farmer", "elder"]
+# Multipliers/modulus for a deterministic, sparse decorative-grass mask.
+# These values intentionally differ from Thornveil's handcrafted pattern so
+# procedural towns do not all share the exact same speckle layout.
 _GRASS_PATTERN_X_MUL = 19
 _GRASS_PATTERN_Y_MUL = 23
 _GRASS_PATTERN_MOD = 41
@@ -72,6 +75,8 @@ def generate_town(world: World, site: str, map_width: int, map_height: int, rng:
     game_map = GameMap(world, map_width, map_height)
     game_map.tiles[:, :] = tile_types.FLOOR
     yy, xx = np.indices((map_height, map_width))
+    # Weighting by character position avoids collisions for simple anagrams and
+    # makes each site's decorative grass pattern distinct yet deterministic.
     site_offset = sum((i + 1) * ord(ch) for i, ch in enumerate(site))
     grass_mask = ((xx * _GRASS_PATTERN_X_MUL + yy * _GRASS_PATTERN_Y_MUL + site_offset) % _GRASS_PATTERN_MOD) == 0
     game_map.tiles[grass_mask] = tile_types.GRASS
