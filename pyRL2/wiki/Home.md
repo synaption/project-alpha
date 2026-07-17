@@ -9,6 +9,9 @@ game.
 - ✅ esper ECS wired up (3.x, module-level API)
 - ✅ Bordered map rendered to the terminal via curses
 - ✅ Movable `@` with wall collision (arrows / hjkl / wasd)
+- ✅ Title screen + main menu + in-game pause menu
+- ✅ Save/load flow with default and user save files
+- ✅ Default/working options files with auto-bootstrap
 - ✅ Renderer fully decoupled behind an interface
 - ⬜ Enemies, FOV, dungeon generation, real turn queue (see [Roadmap](Roadmap.md))
 
@@ -27,6 +30,7 @@ game.
 ## The one idea to take away
 
 Game and system code **never import curses**. Display goes through a `Renderer`
-interface and input arrives as abstract action strings (`move_up`, `quit`, …).
-Swapping to raylib/pygame means writing one class — nothing else changes. See
+interface and input arrives as abstract action strings (`move_up`, `menu_select`,
+`open_pause_menu`, …). Swapping to raylib/pygame means writing one class —
+nothing else changes. See
 [Renderers](Renderers.md).

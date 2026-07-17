@@ -25,7 +25,8 @@ enter and `teardown()` on exit, so the terminal is always restored even on error
 `poll_action()` returns backend-independent strings, never raw key codes:
 
 ```
-"move_up"  "move_down"  "move_left"  "move_right"  "quit"  None
+"move_up"  "move_down"  "move_left"  "move_right"
+"menu_select"  "open_pause_menu"  None
 ```
 
 `None` means "key not recognised". This is why swapping backends doesn't touch
@@ -42,9 +43,11 @@ curses and owns the key map:
 | ↓ / `j` / `s` | `move_down` |
 | ← / `h` / `a` | `move_left` |
 | → / `l` / `d` | `move_right` |
-| `q` / `Esc` (27) | `quit` |
+| `Enter` | `menu_select` |
+| `Esc` (27) | `open_pause_menu` |
 
 Notes:
+- `setup()` sets `curses.set_escdelay(25)` so Escape opens menus quickly.
 - `setup()` calls `initscr`, `noecho`, `cbreak`, hides the cursor, enables
   `keypad` (so arrow keys arrive as `KEY_UP` etc.).
 - `draw_glyph`/`draw_text` swallow the `curses.error` raised when writing the

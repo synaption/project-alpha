@@ -21,13 +21,16 @@ _KEY_TO_ACTION = {
     ord("s"): "move_down",
     ord("a"): "move_left",
     ord("d"): "move_right",
-    ord("q"): "quit",
-    27: "quit",  # ESC
+    curses.KEY_ENTER: "menu_select",
+    10: "menu_select",  # Enter (LF)
+    13: "menu_select",  # Enter (CR)
+    27: "open_pause_menu",  # ESC
 }
 
 
 class TerminalRenderer(Renderer):
     def setup(self) -> None:
+        curses.set_escdelay(25)
         self.stdscr = curses.initscr()
         curses.noecho()
         curses.cbreak()

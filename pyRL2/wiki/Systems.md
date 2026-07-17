@@ -50,7 +50,7 @@ class RenderProcessor(esper.Processor):
         for _ent, (pos, rend) in esper.get_components(Position, Renderable):
             r.draw_glyph(pos.x, pos.y, rend.glyph)
         # 3. UI
-        r.draw_text(0, self.game_map.height, "move: arrows/hjkl/wasd   quit: q")
+        r.draw_text(0, self.game_map.height, "move: arrows/hjkl/wasd   menu: esc")
         r.present()
 ```
 

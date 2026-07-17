@@ -69,9 +69,14 @@ sequenceDiagram
         Main->>Ren: poll_action()
         Ren->>U: block on getch()
         U-->>Ren: key press
-        Ren-->>Main: "move_up" | "quit" | None
-        alt quit
-            Main->>Main: break
+        Ren-->>Main: "move_up" | "open_pause_menu" | None
+        alt open pause menu
+            Main->>Main: show pause menu
+            alt pause choice is quit
+                Main->>Main: break
+            else pause choice is save/resume/options
+                Main->>Draw: redraw frame
+            end
         else action
             Main->>Move: esper.process(action)
             Move->>Move: move player if walkable
@@ -89,12 +94,15 @@ guarantees movement is applied *before* the frame is drawn.
 ## Data flow of a keypress
 
 1. `TerminalRenderer.poll_action()` reads a raw key and maps it to an action
-   string (`move_left`).
+    string (`move_left`, `menu_select`, `open_pause_menu`, ...).
 2. `main.py` passes it to `esper.process("move_left")`.
 3. `MovementProcessor` looks up the delta, finds every `Position` + `Player`
    entity, and moves it if `GameMap.is_walkable`.
 4. `RenderProcessor` clears the frame, draws the map, draws every `Renderable`,
    draws the status line, and presents.
+
+Pause-menu actions (`save`, `options`, `quit`) are handled in `main.py` UI flow,
+not by ECS movement/render systems.
 
 ## Testing headless
 
