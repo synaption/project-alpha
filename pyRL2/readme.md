@@ -20,6 +20,29 @@ Or bypass the title screen/main menu and load a specific save file:
 Move: wasd (also arrow keys / hjkl). Menu: Esc. Save/Quit are in the menu.
 (Needs a real terminal — curses won't run from an IDE output pane.)
 
+## Testing
+
+Tests are headless and do not require curses. They use a fake renderer test
+double to validate ECS movement + render-loop behavior.
+
+Install pytest (once):
+
+  python3 -m pip install --user pytest
+
+Run tests:
+
+  ./run_tests.sh
+
+This shows per-test status (`PASSED`/`FAILED`) and basic timing metrics.
+
+Run only headless renderer integration tests:
+
+  ./run_tests.sh headless
+
+Run only totally unrendered logic/data tests:
+
+  ./run_tests.sh unrendered
+
 ## Menus
 
 - Startup flow: Title Screen -> Main Menu (`Continue`, `New Game`, `Quit`)
@@ -63,3 +86,46 @@ Game/system code never imports curses. To add tcod/pygame/raylib, implement the
 poll_action`) and pass that instance to `RenderProcessor` in `main.py`. Input is
 already abstracted to action strings (`move_up`, `quit`, …), so nothing else
 changes.
+
+## Inspiration
+Caves of Qud
+Lord of the Rings
+DaFluffyPotato
+Minecraft
+Rimworld
+Dwarf Fortress
+Song of Syx
+Infectionator World Dominator
+Earth Defense Force
+
+
+## Themes
+Fantasy
+Time Travel
+Knowledge and Teaching
+Zombie
+MacGuffins/Plot Coupons
+- the one ring
+- the infinity stones
+- dragon balls
+
+
+## Design Goals Big Picture
+Thousands of Years Simulations
+Economy, Money, Banking, Farming, Hunting, Fishing, Thirst, Hunger
+Action Economy:
+- There is a certain amount of time in a day.
+- There is a turn order.
+- Actions take a certain amount of time based on a number of factors, quickness, movement speed, agility, ect.
+- Turn order is decided based on when actions are completed.  So everything is in action or it's waiting for it's next turn. 
+- The effects of the action are immediate.  i.e. an attack happens, the damage is done immediately, the attacker is in the attack state for a certain amount of time units, and then they are in a wait state until it is there turn.   
+- I will try to balance the action economy so that one day of typical gameplay ends up being 1 hour in real life.  
+- animations happen either in order, or multiple at the same time, depending on what they are.  
+
+
+## Style
+Pixel Art
+HD text
+shader effects, lighting
+basic animations, or no animations at all
+characters face the direction the are going, either just left or right, or up, down, left, and right, or all 8 directions depending on the sprite.  
